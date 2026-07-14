@@ -1,0 +1,641 @@
+diff --git a/Bluetooth/LibreTransmitterMetadata.swift b/Bluetooth/LibreTransmitterMetadata.swift
+index dfe50db..0a155e1 100644
+--- a/Bluetooth/LibreTransmitterMetadata.swift
++++ b/Bluetooth/LibreTransmitterMetadata.swift
+@@ -99,6 +99,7 @@ public enum SensorType: String, CustomStringConvertible {
+     case libre2       = "Libre 2"
+     case libre2US     = "Libre 2 US"
+     case libre2CA     = "Libre 2 CA"
++    case libre2PlusBrazil = "Libre 2 Plus Brazil"
+     case libreSense   = "Libre Sense"
+     case libre3       = "Libre 3"
+     case dexcomOne    = "Dexcom ONE"
+@@ -106,12 +107,19 @@ public enum SensorType: String, CustomStringConvertible {
+     case unknown      = "Libre"
+ 
+     public init(patchInfo: Data) {
++        guard !patchInfo.isEmpty else {
++            self = .unknown
++            return
++        }
++
+         switch patchInfo[0] {
+         case 0xDF, 0xA2: self = .libre1
+         case 0xE5, 0xE6: self = .libreUS14day
+         case 0x70: self = .libreProH
+         case 0xC5, 0x9D, 0xC6, 0x7F: self = .libre2
+-        case 0x76: self = patchInfo[3] == 0x02 ? .libre2US : patchInfo[3] == 0x04 ? .libre2CA : patchInfo[2] >> 4 == 7 ? .libreSense : .unknown
++        case 0x2B: self = .libre2PlusBrazil
++        case 0x76 where patchInfo.count >= 4:
++            self = patchInfo[3] == 0x02 ? .libre2US : patchInfo[3] == 0x04 ? .libre2CA : patchInfo[2] >> 4 == 7 ? .libreSense : .unknown
+         default:
+             if patchInfo.count == 24 {
+                 self = .libre3
+@@ -123,3 +131,31 @@ public enum SensorType: String, CustomStringConvertible {
+ 
+     public var description: String { self.rawValue }
+ }
++
++/// Selects the protocol driver independently from the marketing sensor name.
++/// New regional variants can be identified without silently routing them to a
++/// protocol that writes incompatible commands to the sensor.
++public enum LibreDirectProtocol: String, CustomStringConvertible {
++    case europeanLibre2
++    case brazilLibre2Plus
++    case unsupported
++
++    public var supportsStreaming: Bool {
++        self == .europeanLibre2
++    }
++
++    public var description: String { rawValue }
++}
++
++public extension SensorType {
++    var directProtocol: LibreDirectProtocol {
++        switch self {
++        case .libre2:
++            return .europeanLibre2
++        case .libre2PlusBrazil:
++            return .brazilLibre2Plus
++        default:
++            return .unsupported
++        }
++    }
++}
+diff --git a/LibreSensor/SensorPairing/SensorPairing.swift b/LibreSensor/SensorPairing/SensorPairing.swift
+index fc864f8..fed9ac0 100644
+--- a/LibreSensor/SensorPairing/SensorPairing.swift
++++ b/LibreSensor/SensorPairing/SensorPairing.swift
+@@ -76,8 +76,81 @@ public class SensorPairingInfo: ObservableObject, Codable {
+ 
+ }
+ 
++/// A local, exportable record of the NFC data used to identify a Libre sensor.
++///
++/// The encrypted FRAM is retained because it is required to investigate new
++/// sensor protocols. Trio never uploads this record. The user must explicitly
++/// share it from the setup screen.
++public struct SensorPairingDiagnostic: Codable, Equatable {
++    public let formatVersion: Int
++    public let capturedAt: Date
++    public let sensorUID: String
++    public let patchInfo: String
++    public let sensorType: String
++    public let framByteCount: Int
++    public let encryptedFramBase64: String
++    public let attemptedStreamingCommand: Bool
++    public let notes: String
++
++    public init(
++        formatVersion: Int = 1,
++        capturedAt: Date = Date(),
++        sensorUID: Data,
++        patchInfo: Data,
++        sensorType: SensorType,
++        encryptedFram: Data,
++        attemptedStreamingCommand: Bool,
++        notes: String
++    ) {
++        self.formatVersion = formatVersion
++        self.capturedAt = capturedAt
++        self.sensorUID = sensorUID.hexEncodedString().uppercased()
++        self.patchInfo = patchInfo.hexEncodedString().uppercased()
++        self.sensorType = sensorType.description
++        self.framByteCount = encryptedFram.count
++        self.encryptedFramBase64 = encryptedFram.base64EncodedString()
++        self.attemptedStreamingCommand = attemptedStreamingCommand
++        self.notes = notes
++    }
++
++    public var json: String {
++        let encoder = JSONEncoder()
++        encoder.dateEncodingStrategy = .iso8601
++        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
++
++        guard let data = try? encoder.encode(self),
++              let result = String(data: data, encoding: .utf8)
++        else {
++            return "Unable to encode Libre pairing diagnostic"
++        }
++
++        return result
++    }
++}
++
++public enum SensorPairingDiagnosticStore {
++    private static let latestDiagnosticKey = "com.loopkit.libre.pairing-diagnostic.latest"
++
++    public static var latest: SensorPairingDiagnostic? {
++        guard let data = UserDefaults.standard.data(forKey: latestDiagnosticKey) else {
++            return nil
++        }
++
++        return try? JSONDecoder().decode(SensorPairingDiagnostic.self, from: data)
++    }
++
++    public static func save(_ diagnostic: SensorPairingDiagnostic) {
++        guard let data = try? JSONEncoder().encode(diagnostic) else {
++            return
++        }
++
++        UserDefaults.standard.set(data, forKey: latestDiagnosticKey)
++    }
++}
++
+ public protocol SensorPairingProtocol: AnyObject {
+     var onCancel: (() -> Void)? { get set }
+     var publisher: AnyPublisher<SensorPairingInfo, Never> { get }
++    var errorPublisher: AnyPublisher<Error, Never> { get }
+     func pairSensor() throws
+ }
+diff --git a/LibreSensor/SensorPairing/SensorPairingService.swift b/LibreSensor/SensorPairing/SensorPairingService.swift
+index ce31cd4..4fe54a5 100644
+--- a/LibreSensor/SensorPairing/SensorPairingService.swift
++++ b/LibreSensor/SensorPairing/SensorPairingService.swift
+@@ -13,6 +13,7 @@ public enum PairingError: Error {
+     case noTagInfo
+     case noSensorData
+     case wrongSensorType
++    case unsupportedDirectProtocol(SensorPairingDiagnostic)
+     case decryptionError
+     case noPatchInfo
+     case nfcNotSupported
+@@ -27,6 +28,8 @@ extension PairingError: LocalizedError {
+             return LocalizedString("Could not get sensor data", comment: "error description for PairingError.noSensorData")
+         case .wrongSensorType:
+             return LocalizedString("Wrong sensor type detected", comment: "error description for PairingError.wrongSensorType")
++        case .unsupportedDirectProtocol(let diagnostic):
++            return diagnostic.sensorType
+         case .decryptionError:
+             return LocalizedString("Could not decrypt sensor contents", comment: "error description for PairingError.decryptionError")
+         case .noPatchInfo:
+@@ -40,6 +43,9 @@ extension PairingError: LocalizedError {
+         switch self {
+         case .nfcNotSupported:
+             return LocalizedString("Your phone or app is not enabled for NFC communications, which is needed to pair to libre2 sensors", comment: "Recovery suggestion for PairingError.nfcNotSupported")
++        case .unsupportedDirectProtocol(let diagnostic):
++            return "Trio safely identified this sensor (patchInfo \(diagnostic.patchInfo)). " +
++                "The European Libre 2 streaming command was not sent. Share the saved diagnostic to continue driver development."
+         default:
+             return nil
+         }
+@@ -55,6 +61,7 @@ public class SensorPairingService: NSObject, NFCTagReaderSessionDelegate, Sensor
+     private let accessQueue = DispatchQueue(label: "libre-direct.nfc-access-queue")
+ 
+     private let unlockCode: UInt32 = 42 // 42
++    private var hasReportedPairingError = false
+ 
+     public var onCancel: (() -> Void)?
+ 
+@@ -63,6 +70,7 @@ public class SensorPairingService: NSObject, NFCTagReaderSessionDelegate, Sensor
+             throw PairingError.nfcNotSupported
+         }
+         print("Asked to pair sensor! phoneNFCAvailable: \(Features.phoneNFCAvailable)")
++        hasReportedPairingError = false
+ 
+         if NFCTagReaderSession.readingAvailable {
+             accessQueue.async {
+@@ -82,6 +90,7 @@ public class SensorPairingService: NSObject, NFCTagReaderSessionDelegate, Sensor
+     }
+     
+     private func sendError(_ error: Error) {
++        hasReportedPairingError = true
+         DispatchQueue.main.async { [weak self] in
+             self?.errorSubject.send(error)
+         }
+@@ -97,7 +106,10 @@ public class SensorPairingService: NSObject, NFCTagReaderSessionDelegate, Sensor
+     }
+ 
+     public func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {
+-        if let error = error as? NFCReaderError, error.code != .readerSessionInvalidationErrorUserCanceled {
++        if let error = error as? NFCReaderError,
++           error.code != .readerSessionInvalidationErrorUserCanceled,
++           !hasReportedPairingError
++        {
+             session.invalidate(errorMessage: "Connection failure: \(error.localizedDescription)")
+             self.sendError(error)
+         }
+@@ -109,15 +121,10 @@ public class SensorPairingService: NSObject, NFCTagReaderSessionDelegate, Sensor
+         guard let firstTag = tags.first else { return }
+         guard case .iso15693(let tag) = firstTag else { return }
+ 
+-        let blocks = 43
+-        let requestBlocks = 3
+-
+-        let requests = Int(ceil(Double(blocks) / Double(requestBlocks)))
+-        let remainder = blocks % requestBlocks
+-        var dataArray = [Data](repeating: Data(), count: blocks)
+-
+         session.connect(to: firstTag) { error in
+-            if error != nil {
++            if let error {
++                session.invalidate(errorMessage: PairingError.noTagInfo.localizedDescription)
++                self.sendError(error)
+                 return
+             }
+ 
+@@ -129,88 +136,28 @@ public class SensorPairingService: NSObject, NFCTagReaderSessionDelegate, Sensor
+                     return
+                 case .success:
+                     tag.customCommand(requestFlags: .highDataRate, customCommandCode: 0xA1, customRequestParameters: Data()) { response, error in
++                        guard error == nil, response.count >= 6 else {
++                            session.invalidate(errorMessage: PairingError.noPatchInfo.localizedDescription)
++                            self.sendError(error ?? PairingError.noPatchInfo)
++                            return
++                        }
+ 
+-                        for i in 0 ..< requests {
+-                            tag.readMultipleBlocks(
+-                                requestFlags: [.highDataRate, .address],
+-                                // swiftlint:disable:next line_length
+-                                blockRange: NSRange(UInt8(i * requestBlocks) ... UInt8(i * requestBlocks + (i == requests - 1 ? (remainder == 0 ? requestBlocks : remainder) : requestBlocks) - (requestBlocks > 1 ? 1 : 0)))
+-                                
+-                            ) { blockArray, error in
+-                                if error != nil {
+-                                    if i != requests - 1 { return }
+-                                } else {
+-                                    for j in 0 ..< blockArray.count {
+-                                        dataArray[i * requestBlocks + j] = blockArray[j]
+-                                    }
+-                                }
+-
+-                                if i == requests - 1 {
+-                                    var fram = Data()
+-
+-                                    for (_, data) in dataArray.enumerated() {
+-                                        if data.count > 0 {
+-                                            fram.append(data)
+-                                        }
+-                                    }
+-
+-                                    // get sensorUID and patchInfo and send to delegate
+-                                    let sensorUID = Data(tag.identifier.reversed())
+-                                    let patchInfo = response
+-
+-                                    // patchInfo should have length 6, which sometimes is not the case, as there are occuring crashes in nfcCommand and Libre2BLEUtilities.streamingUnlockPayload
+-                                    guard patchInfo.count >= 6 else {
+-                                        session.invalidate(errorMessage: PairingError.noPatchInfo.localizedDescription)
+-                                        return
+-                                    }
+-
+-                                    let subCmd: Subcommand = .enableStreaming
+-                                    let cmd = self.nfcCommand(subCmd, unlockCode: self.unlockCode, patchInfo: patchInfo, sensorUID: sensorUID)
+-
+-                                    tag.customCommand(requestFlags: .highDataRate, customCommandCode: Int(cmd.code), customRequestParameters: cmd.parameters) { response, _ in
+-                                        var streamingEnabled = false
+-                                        var macAddress : String?
+-
+-                                        if subCmd == .enableStreaming && response.count == 6 {
+-                                            streamingEnabled = true
+-                                            macAddress = Data(response.reversed()).hexEncodedString().uppercased()
+-                                        }
+-
+-                                        
+-
+-                                        let patchHex = patchInfo.hexEncodedString()
+-                                        let sensorType = SensorType(patchInfo: patchInfo)
+-
+-                                        print("got patchhex: \(patchHex) and sensorType: \(sensorType), with mac address: \(macAddress)")
+-
+-                                        guard sensorUID.count == 8 && patchInfo.count == 6 && fram.count == 344 else {
+-                                            // self.readingsSubject.send(completion: .failure(LibreError.noSensorData))
+-                                            session.invalidate(errorMessage: PairingError.noSensorData.localizedDescription)
+-                                            self.sendError(PairingError.noSensorData)
+-                                            return
+-                                        }
+-                                        
+-                                        guard sensorType == .libre2  else {
+-                                            session.invalidate(errorMessage: PairingError.wrongSensorType.localizedDescription)
+-                                            self.sendError(PairingError.noSensorData)
+-                                            return
+-                                        }
+-                                        
+-                                        
+-
+-                                        do {
+-                                            let decryptedBytes = try Libre2.decryptFRAM(type: sensorType, id: [UInt8](sensorUID), info: patchInfo, data: [UInt8](fram))
+-
+-                                            self.sendUpdate(SensorPairingInfo(uuid: sensorUID, patchInfo: patchInfo, fram: Data(decryptedBytes), streamingEnabled: streamingEnabled, macAddress: macAddress))
+-                                            session.invalidate()
+-                                            return
+-                                        } catch {
+-                                            print("problem decrypting")
+-                                            session.invalidate(errorMessage: PairingError.decryptionError.localizedDescription)
+-                                            self.sendError(PairingError.decryptionError)
+-                                        }
+-                                    }
+-                                }
++                        let sensorUID = Data(tag.identifier.reversed())
++                        let patchInfo = response
++
++                        self.readFRAM(from: tag) { result in
++                            switch result {
++                            case .failure(let error):
++                                session.invalidate(errorMessage: PairingError.noSensorData.localizedDescription)
++                                self.sendError(error)
++                            case .success(let fram):
++                                self.completePairing(
++                                    session: session,
++                                    tag: tag,
++                                    sensorUID: sensorUID,
++                                    patchInfo: patchInfo,
++                                    encryptedFram: fram
++                                )
+                             }
+                         }
+                     }
+@@ -219,6 +166,136 @@ public class SensorPairingService: NSObject, NFCTagReaderSessionDelegate, Sensor
+         }
+     }
+ 
++    /// Reads all 43 FRAM blocks in order. The previous implementation launched
++    /// every request concurrently and processed the data when the final request
++    /// happened to finish, which could produce a partial 344-byte capture.
++    private func readFRAM(
++        from tag: NFCISO15693Tag,
++        currentBlock: Int = 0,
++        collected: Data = Data(),
++        completion: @escaping (Result<Data, Error>) -> Void
++    ) {
++        let totalBlocks = 43
++        let blocksPerRequest = 3
++
++        guard currentBlock < totalBlocks else {
++            completion(.success(collected))
++            return
++        }
++
++        let blockCount = min(blocksPerRequest, totalBlocks - currentBlock)
++        let blockRange = NSRange(location: currentBlock, length: blockCount)
++
++        tag.readMultipleBlocks(
++            requestFlags: [.highDataRate, .address],
++            blockRange: blockRange
++        ) { blockArray, error in
++            if let error {
++                completion(.failure(error))
++                return
++            }
++
++            guard blockArray.count == blockCount else {
++                completion(.failure(PairingError.noSensorData))
++                return
++            }
++
++            var next = collected
++            blockArray.forEach { next.append($0) }
++
++            self.readFRAM(
++                from: tag,
++                currentBlock: currentBlock + blockCount,
++                collected: next,
++                completion: completion
++            )
++        }
++    }
++
++    /// Validates and classifies the sensor before any command that changes its
++    /// streaming state is sent.
++    private func completePairing(
++        session: NFCTagReaderSession,
++        tag: NFCISO15693Tag,
++        sensorUID: Data,
++        patchInfo: Data,
++        encryptedFram: Data
++    ) {
++        guard sensorUID.count == 8, patchInfo.count == 6, encryptedFram.count == 344 else {
++            session.invalidate(errorMessage: PairingError.noSensorData.localizedDescription)
++            sendError(PairingError.noSensorData)
++            return
++        }
++
++        let sensorType = SensorType(patchInfo: patchInfo)
++        let directProtocol = sensorType.directProtocol
++
++        guard directProtocol.supportsStreaming else {
++            let diagnostic = SensorPairingDiagnostic(
++                sensorUID: sensorUID,
++                patchInfo: patchInfo,
++                sensorType: sensorType,
++                encryptedFram: encryptedFram,
++                attemptedStreamingCommand: false,
++                notes: "Preflight NFC capture. No streaming command was sent for protocol \(directProtocol)."
++            )
++            SensorPairingDiagnosticStore.save(diagnostic)
++
++            let pairingError = PairingError.unsupportedDirectProtocol(diagnostic)
++            session.invalidate(errorMessage: pairingError.localizedDescription)
++            sendError(pairingError)
++            return
++        }
++
++        let subcommand: Subcommand = .enableStreaming
++        let command = nfcCommand(
++            subcommand,
++            unlockCode: unlockCode,
++            patchInfo: patchInfo,
++            sensorUID: sensorUID
++        )
++
++        tag.customCommand(
++            requestFlags: .highDataRate,
++            customCommandCode: Int(command.code),
++            customRequestParameters: command.parameters
++        ) { response, commandError in
++            let diagnostic = SensorPairingDiagnostic(
++                sensorUID: sensorUID,
++                patchInfo: patchInfo,
++                sensorType: sensorType,
++                encryptedFram: encryptedFram,
++                attemptedStreamingCommand: true,
++                notes: "European Libre 2 streaming response bytes: \(response.count); error: \(commandError?.localizedDescription ?? \"none\")."
++            )
++            SensorPairingDiagnosticStore.save(diagnostic)
++
++            let streamingEnabled = response.count == 6
++            let macAddress = streamingEnabled ? Data(response.reversed()).hexEncodedString().uppercased() : nil
++
++            do {
++                let decryptedBytes = try Libre2.decryptFRAM(
++                    type: sensorType,
++                    id: [UInt8](sensorUID),
++                    info: patchInfo,
++                    data: [UInt8](encryptedFram)
++                )
++
++                self.sendUpdate(SensorPairingInfo(
++                    uuid: sensorUID,
++                    patchInfo: patchInfo,
++                    fram: Data(decryptedBytes),
++                    streamingEnabled: streamingEnabled,
++                    macAddress: macAddress
++                ))
++                session.invalidate()
++            } catch {
++                session.invalidate(errorMessage: PairingError.decryptionError.localizedDescription)
++                self.sendError(PairingError.decryptionError)
++            }
++        }
++    }
++
+     private func readRaw(_ address: UInt16, _ bytes: Int, buffer: Data = Data(), tag: NFCISO15693Tag, handler: @escaping (UInt16, Data, Error?) -> Void) {
+         
+         var buffer = buffer
+diff --git a/LibreTransmitter/Mocks/MockSensorPairingService.swift b/LibreTransmitter/Mocks/MockSensorPairingService.swift
+index 04178b1..9d1741a 100644
+--- a/LibreTransmitter/Mocks/MockSensorPairingService.swift
++++ b/LibreTransmitter/Mocks/MockSensorPairingService.swift
+@@ -14,6 +14,7 @@ public class MockSensorPairingService: SensorPairingProtocol {
+     fileprivate lazy var logger = Logger(forType: Self.self)
+ 
+     private var readingsSubject = PassthroughSubject<SensorPairingInfo, Never>()
++    private var errorSubject = PassthroughSubject<Error, Never>()
+ 
+     public var onCancel: (() -> Void)?
+ 
+@@ -21,6 +22,10 @@ public class MockSensorPairingService: SensorPairingProtocol {
+         readingsSubject.eraseToAnyPublisher()
+     }
+ 
++    public var errorPublisher: AnyPublisher<Error, Never> {
++        errorSubject.eraseToAnyPublisher()
++    }
++
+     public init() {
+     }
+ 
+diff --git a/LibreTransmitterTests/LibreTransmitterTests.swift b/LibreTransmitterTests/LibreTransmitterTests.swift
+index 3cd24c6..ec7055d 100644
+--- a/LibreTransmitterTests/LibreTransmitterTests.swift
++++ b/LibreTransmitterTests/LibreTransmitterTests.swift
+@@ -6,7 +6,9 @@
+ //  Copyright © 2016 Mark Wilson. All rights reserved.
+ //
+ 
++import Foundation
+ import XCTest
++@testable import LibreTransmitter
+ 
+ class LibreTransmitterTests: XCTestCase {
+ 
+@@ -25,6 +27,42 @@ class LibreTransmitterTests: XCTestCase {
+         // Use XCTAssert and related functions to verify your tests produce the correct results.
+     }
+ 
++    func testBrazilLibre2PlusUsesDedicatedNonStreamingProtocol() {
++        let patchInfo = Data([0x2B, 0x0A, 0x3A, 0x08, 0x1F, 0xE1])
++        let sensorType = SensorType(patchInfo: patchInfo)
++
++        XCTAssertEqual(sensorType, .libre2PlusBrazil)
++        XCTAssertEqual(sensorType.directProtocol, .brazilLibre2Plus)
++        XCTAssertFalse(sensorType.directProtocol.supportsStreaming)
++    }
++
++    func testEuropeanLibre2KeepsExistingDirectProtocol() {
++        let patchInfo = Data([0x9D, 0x08, 0x30, 0x01, 0x9C, 0x16])
++        let sensorType = SensorType(patchInfo: patchInfo)
++
++        XCTAssertEqual(sensorType, .libre2)
++        XCTAssertEqual(sensorType.directProtocol, .europeanLibre2)
++        XCTAssertTrue(sensorType.directProtocol.supportsStreaming)
++    }
++
++    func testPairingDiagnosticExportsEncryptedCapture() {
++        let diagnostic = SensorPairingDiagnostic(
++            capturedAt: Date(timeIntervalSince1970: 0),
++            sensorUID: Data([0xE0, 0x07, 0xA4, 0x00, 0x1A, 0x40, 0xBF, 0x24]),
++            patchInfo: Data([0x2B, 0x0A, 0x3A, 0x08, 0x1F, 0xE1]),
++            sensorType: .libre2PlusBrazil,
++            encryptedFram: Data([0x01, 0x02, 0x03]),
++            attemptedStreamingCommand: false,
++            notes: "test"
++        )
++
++        XCTAssertEqual(diagnostic.sensorUID, "E007A4001A40BF24")
++        XCTAssertEqual(diagnostic.patchInfo, "2B0A3A081FE1")
++        XCTAssertEqual(diagnostic.encryptedFramBase64, "AQID")
++        XCTAssertFalse(diagnostic.attemptedStreamingCommand)
++        XCTAssertTrue(diagnostic.json.contains("Libre 2 Plus Brazil"))
++    }
++
+     func testPerformanceExample() {
+         // This is an example of a performance test case.
+         self.measure {
+diff --git a/LibreTransmitterUI/Views/Setup/Libre2DirectSetup.swift b/LibreTransmitterUI/Views/Setup/Libre2DirectSetup.swift
+index cdf4303..5455cb9 100644
+--- a/LibreTransmitterUI/Views/Setup/Libre2DirectSetup.swift
++++ b/LibreTransmitterUI/Views/Setup/Libre2DirectSetup.swift
+@@ -20,6 +20,7 @@ struct Libre2DirectSetup: View {
+     @State private var showPairingInfo = false
+     @State private var isPairing = false
+     @State private var pairingInfo = SensorPairingInfo()
++    @State private var pairingDiagnostic: SensorPairingDiagnostic?
+ 
+     @ObservedObject public var cancelNotifier: GenericObservableObject
+     @ObservedObject public var saveNotifier: GenericObservableObject
+@@ -35,6 +36,7 @@ struct Libre2DirectSetup: View {
+         }
+         
+         showPairingInfo = false
++        pairingDiagnostic = nil
+         isPairing = true
+ 
+         do {
+@@ -44,6 +46,19 @@ struct Libre2DirectSetup: View {
+             presentableStatus = StatusMessage(title: error.localizedDescription, message: message)
+         }
+     }
++
++    func receivePairingError(_ error: Error) {
++        isPairing = false
++
++        if let pairingError = error as? PairingError,
++           case .unsupportedDirectProtocol(let diagnostic) = pairingError
++        {
++            pairingDiagnostic = diagnostic
++        }
++
++        let message = (error as? LocalizedError)?.recoverySuggestion ?? error.localizedDescription
++        presentableStatus = StatusMessage(title: error.localizedDescription, message: message)
++    }
+     
+     func receivePairingInfo(_ info: SensorPairingInfo) {
+ 
+@@ -127,12 +142,36 @@ struct Libre2DirectSetup: View {
+                 }
+                 .actionButtonStyle(.primary)
+                 .disabled(isPairing)
++
++                if let pairingDiagnostic {
++                    VStack(alignment: .leading, spacing: 8) {
++                        Text("\(pairingDiagnostic.sensorType) detected")
++                            .font(.headline)
++                        Text("No incompatible streaming command was sent. The NFC diagnostic is ready to share for driver development.")
++                            .font(.footnote)
++                        Text("UID: \(pairingDiagnostic.sensorUID)")
++                            .font(.caption.monospaced())
++                        Text("Patch info: \(pairingDiagnostic.patchInfo)")
++                            .font(.caption.monospaced())
++
++                        if #available(iOS 16.0, macOS 13.0, *) {
++                            ShareLink(item: pairingDiagnostic.json) {
++                                Label("Share Libre Diagnostic", systemImage: "square.and.arrow.up")
++                            }
++                        } else {
++                            Text("Copy the diagnostic from a device running iOS 16 or later.")
++                                .font(.footnote)
++                        }
++                    }
++                    .padding(.top, 8)
++                }
+             }.padding()
+         }
+         .navigationTitle("Libre 2 Setup")
+         .navigationBarBackButtonHidden(true)
+         .navigationBarItems(leading: cancelButton)  // the pair button does the save process for us! //, trailing: saveButton)
+         .onReceive(pairingService.publisher, perform: receivePairingInfo)
++        .onReceive(pairingService.errorPublisher, perform: receivePairingError)
+         .alert(item: $presentableStatus) { status in
+             Alert(title: Text(status.title), message: Text(status.message), dismissButton: .default(Text("Got it!")))
+         
