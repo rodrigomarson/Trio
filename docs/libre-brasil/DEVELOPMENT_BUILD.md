@@ -47,8 +47,9 @@ captures read-only NFC evidence before adding a Brazilian protocol driver.
 ## Repository layout
 
 The Trio repository continues to pin the official LibreTransmitter submodule commit.
-The Brazilian changes are stored in `ci_scripts/libre_brasil.patch`. Both Xcode Cloud
-and local development apply that patch with `ci_scripts/apply_libre_brasil_patch.sh`.
+The Brazilian changes are stored as `ci_scripts/libre_brasil.patch.b64`. Both Xcode
+Cloud and local development decode and apply that patch with
+`ci_scripts/apply_libre_brasil_patch.sh`.
 
 Xcode Cloud automatically discovers `ci_scripts/ci_post_clone.sh` after cloning the
 repository. For a local clone, run:
