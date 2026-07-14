@@ -1,58 +1,67 @@
-# Trio Libre Brazil development build
+# Build de desenvolvimento do Trio para o Libre Brasil
 
-## Build identity
+## Identificação da build
 
-| Item | Value |
+| Item | Valor |
 | --- | --- |
-| Upstream baseline | Trio `dev` at `40d45894db5c53ca6b9e67237b2c6d57ea31670c` |
-| Upstream development version | `0.8.4.16` |
-| This development version | `0.8.4.17` |
-| Apple development team | `6KLJLLTX3K` |
-| Bundle identifier | `org.nightscout.6KLJLLTX3K.trio` |
-| Shared scheme | `Trio` |
-| Distribution | Xcode Cloud to TestFlight |
+| Base upstream | Trio `dev` no commit `40d45894db5c53ca6b9e67237b2c6d57ea31670c` |
+| Versão de desenvolvimento upstream | `0.8.4.16` |
+| Esta versão de desenvolvimento | `0.8.4.17` |
+| Equipe de desenvolvimento Apple | `6KLJLLTX3K` |
+| Identificador do bundle | `org.nightscout.6KLJLLTX3K.trio` |
+| Scheme compartilhado | `Trio` |
+| Distribuição | Xcode Cloud para TestFlight |
 
-This branch is the first safe diagnostic stage for direct support of the Brazilian
-FreeStyle Libre 2 Plus. It does not yet convert Brazilian sensor frames into glucose
-values. Its purpose is to identify the sensor reliably, preserve the captured NFC
-data, and avoid sending an unverified European streaming command to the sensor.
+Esta branch representa a primeira etapa diagnóstica segura para o suporte direto ao
+FreeStyle Libre 2 Plus brasileiro. Ela ainda não converte os frames do sensor
+brasileiro em valores de glicose. Seu objetivo é identificar o sensor de forma
+confiável, preservar os dados NFC capturados e evitar o envio de um comando europeu
+de streaming ainda não validado para esse sensor.
 
-## Evidence boundary
+## Limites das evidências
 
-The initial classifier is based on Brazilian Libre 2 Plus captures with patch info
-`2B 0A 3A 08 1F E1` and product family 3. Community investigations also report that
-the official LibreLink path recognizes these sensors while current European direct
-algorithms reject them. See the related xDrip investigations
-[#3545](https://github.com/NightscoutFoundation/xDrip/discussions/3545) and
+O classificador inicial é baseado em capturas do Libre 2 Plus brasileiro com patch
+info `2B 0A 3A 08 1F E1` e família de produto 3. Investigações da comunidade também
+relatam que o caminho oficial do LibreLink reconhece esses sensores, enquanto os
+algoritmos europeus atuais de conexão direta os rejeitam. Consulte as investigações
+relacionadas do xDrip
+[#3545](https://github.com/NightscoutFoundation/xDrip/discussions/3545) e
 [#4028](https://github.com/NightscoutFoundation/xDrip/discussions/4028).
 
-These observations identify a distinct protocol family; they do not establish a safe
-streaming activation or decryption algorithm. That uncertainty is why this build
-captures read-only NFC evidence before adding a Brazilian protocol driver.
+Essas observações identificam uma família de protocolo distinta, mas não estabelecem
+um algoritmo seguro para ativação do streaming ou descriptografia. Por isso, esta
+build captura evidências NFC somente para leitura antes da inclusão de um driver para
+o protocolo brasileiro.
 
-## What changed
+## Alterações realizadas
 
-- Recognizes patch-info values beginning with `0x2B` as Libre 2 Plus Brazil.
-- Classifies the sensor protocol before any NFC streaming command is sent.
-- Keeps the existing European Libre 2 pairing and decryption path unchanged.
-- Blocks the European `A1/1E` enable-streaming command for the Brazilian variant.
-- Reads all 43 NFC blocks sequentially, preventing a partial-FRAM race during pairing.
-- Stores a versioned diagnostic containing the UID, patch info, sensor type, encrypted
-  FRAM, timestamp, and whether a streaming command was attempted.
-- Shows the detected Brazilian sensor explicitly in the setup screen and provides a
-  Share action for the diagnostic JSON.
-- Applies the LibreTransmitter change from the Trio repository itself, so the same
-  source is used on a local Mac and in Xcode Cloud without requiring a second fork.
+- Reconhece valores de patch info iniciados por `0x2B` como Libre 2 Plus Brasil.
+- Classifica o protocolo do sensor antes de enviar qualquer comando NFC de streaming.
+- Mantém inalterado o fluxo existente de pareamento e descriptografia do Libre 2
+  europeu.
+- Bloqueia o comando europeu `A1/1E` de ativação do streaming para a variante
+  brasileira.
+- Lê sequencialmente todos os 43 blocos NFC, evitando uma condição de corrida que
+  poderia produzir uma captura parcial da FRAM durante o pareamento.
+- Armazena um diagnóstico versionado contendo UID, patch info, tipo do sensor, FRAM
+  criptografada, data e hora da captura e indicação de tentativa de envio do comando
+  de streaming.
+- Exibe explicitamente o sensor brasileiro detectado na tela de configuração e
+  oferece uma ação de compartilhamento do diagnóstico em JSON.
+- Aplica a alteração do LibreTransmitter a partir do próprio repositório do Trio, para
+  que o Mac local e o Xcode Cloud utilizem o mesmo código-fonte sem exigir um segundo
+  fork.
 
-## Repository layout
+## Estrutura do repositório
 
-The Trio repository continues to pin the official LibreTransmitter submodule commit.
-The Brazilian changes are stored as `ci_scripts/libre_brasil.patch.b64`. Both Xcode
-Cloud and local development decode and apply that patch with
+O repositório do Trio continua fixando o commit oficial do submódulo
+LibreTransmitter. As alterações brasileiras são armazenadas em
+`ci_scripts/libre_brasil.patch.b64`. Tanto o Xcode Cloud quanto o desenvolvimento
+local decodificam e aplicam esse patch por meio de
 `ci_scripts/apply_libre_brasil_patch.sh`.
 
-Xcode Cloud automatically discovers `ci_scripts/ci_post_clone.sh` after cloning the
-repository. For a local clone, run:
+O Xcode Cloud detecta automaticamente o arquivo `ci_scripts/ci_post_clone.sh` depois
+de clonar o repositório. Para um clone local, execute:
 
 ```sh
 git clone --recurse-submodules --branch rodrigo-libre-brasil-dev \
@@ -62,55 +71,63 @@ cd Trio
 open Trio.xcworkspace
 ```
 
-The patch script is idempotent: running it again after a successful application is
-safe.
+O script do patch é idempotente: executá-lo novamente depois de uma aplicação
+concluída é seguro.
 
-## Local Mac validation
+## Validação local no Mac
 
-1. Select the shared `Trio` scheme and an iPhone destination in Xcode.
-2. Confirm that signing resolves to team `6KLJLLTX3K` with automatic signing enabled.
-3. Resolve Swift packages. The Swift-JWT dependency uses HTTPS in this branch.
-4. Build the `Trio` scheme, then run the LibreTransmitter unit tests.
-5. Archive once locally if signing or entitlement changes need to be diagnosed before
-   starting an Xcode Cloud build.
+1. No Xcode, selecione o scheme compartilhado `Trio` e um iPhone como destino.
+2. Confirme que a assinatura utiliza a equipe `6KLJLLTX3K` e que a assinatura
+   automática está habilitada.
+3. Resolva os pacotes Swift. Nesta branch, a dependência Swift-JWT utiliza HTTPS.
+4. Compile o scheme `Trio` e depois execute os testes unitários do LibreTransmitter.
+5. Gere um archive local se for necessário diagnosticar alterações de assinatura ou
+   entitlements antes de iniciar uma build no Xcode Cloud.
 
-The existing app identifier and entitlements are intentionally preserved so the
-development build follows the same Apple Developer, HealthKit, NFC, Bluetooth,
-Background Modes, Push Notifications, App Groups, and Keychain configuration already
-used by Trio.
+O identificador do app e os entitlements existentes foram preservados
+intencionalmente. Assim, a build de desenvolvimento utiliza a mesma configuração já
+adotada pelo Trio para Apple Developer, HealthKit, NFC, Bluetooth, modos em segundo
+plano, notificações push, App Groups e Keychain.
 
-## Xcode Cloud and TestFlight
+## Xcode Cloud e TestFlight
 
-Use the existing Trio workflow with this branch as its source branch and the shared
-`Trio` scheme. The post-clone script applies the LibreTransmitter patch before package
-resolution and compilation. Configure the workflow to archive for iOS and deploy a
-successful build to the intended internal TestFlight group.
+Utilize o workflow existente do Trio, selecionando esta branch como origem e o scheme
+compartilhado `Trio`. O script pós-clone aplica o patch do LibreTransmitter antes da
+resolução dos pacotes e da compilação. Configure o workflow para gerar um archive de
+iOS e distribuir uma build concluída com sucesso para o grupo interno desejado do
+TestFlight.
 
-The project version is `0.8.4.17` and its local build number starts at `17`. Xcode Cloud
-must still use a build number that is higher than every build already uploaded for
-the same app version. If App Store Connect reports a duplicate build number, set the
-workflow's next build number above the current TestFlight maximum and rebuild.
+A versão do projeto é `0.8.4.17` e o número local da build começa em `17`. O Xcode
+Cloud ainda precisa utilizar um número de build superior a todos os números já
+enviados para a mesma versão do app. Se o App Store Connect informar que o número da
+build está duplicado, defina no workflow o próximo número acima do maior valor atual
+do TestFlight e gere uma nova build.
 
-## Sensor test procedure
+## Procedimento de teste do sensor
 
-Use a development sensor and do not make treatment decisions from this experimental
-build.
+Utilize um sensor destinado ao desenvolvimento e não tome decisões de tratamento com
+base nesta build experimental.
 
-1. Install the build from TestFlight.
-2. In Trio, open CGM setup, select Libre, and choose the direct connection path.
-3. Scan the Brazilian Libre 2 Plus with NFC.
-4. Confirm that Trio reports **Libre 2 Plus Brazil** rather than **No Sensor Detected**.
-5. Confirm that the screen states the European streaming command was not sent.
-6. Share the diagnostic JSON and retain it with the app version and sensor model.
+1. Instale a build pelo TestFlight.
+2. No Trio, abra a configuração do CGM, selecione Libre e escolha o caminho de conexão
+   direta.
+3. Faça a leitura NFC do Libre 2 Plus brasileiro.
+4. Confirme que o Trio informa **Libre 2 Plus Brazil** em vez de
+   **No Sensor Detected**.
+5. Confirme que a tela informa que o comando europeu de streaming não foi enviado.
+6. Compartilhe o diagnóstico JSON e armazene-o junto com a versão do app e o modelo
+   do sensor.
 
-Expected Brazilian result: detection and diagnostic export, with no attempt to enable
-European streaming. Expected European Libre 2 regression result: the existing direct
-pairing path remains available.
+Resultado esperado para o sensor brasileiro: detecção e exportação do diagnóstico,
+sem tentativa de ativar o streaming europeu. Resultado esperado para o teste de
+regressão com o Libre 2 europeu: o caminho existente de pareamento direto continua
+disponível.
 
-## Next protocol stage
+## Próxima etapa do protocolo
 
-The next implementation stage begins only after the Brazilian diagnostic is reviewed.
-It should add a separate Brazilian protocol adapter behind the existing capability
-router, with fixtures and tests for patch parsing, NFC frame handling, streaming
-activation, decryption, glucose extraction, and sensor-state transitions. The
-European adapter should remain unchanged and covered by regression tests.
+A próxima etapa de implementação somente deve começar depois da análise do
+diagnóstico brasileiro. Ela deverá adicionar um adaptador separado para o protocolo
+brasileiro, atrás do roteador de capacidades existente, com fixtures e testes para
+análise do patch, tratamento dos frames NFC, ativação do streaming, descriptografia,
+extração da glicose e transições de estado do sensor. O adaptador europeu deverá
+permanecer inalterado e coberto por testes de regressão.
