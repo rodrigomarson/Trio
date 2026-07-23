@@ -9,5 +9,5 @@ Discovery report privacy hardening commit: 80c1d45
 Expected XCTest count: 58
 macOS phase 2 validation: PASS (41/41, test report 002)
 macOS phase 3 validation: PASS (50/50, test report 003)
-macOS phase 4 validation: PENDING
+macOS phase 4 validation: PASS (58/58, test report 004)
 Hardware status: not validated

@@ -1,4 +1,4 @@
-c9d71da81db3224e99c455da8825b95826ba48bc3ae7ae6e6b6730d17b631f2a  ./CHECKPOINT.txt
+b18a2a639814be531a997f1468795dcb9c80e8c466cc3a0ec5f7ca8d25364c14  ./CHECKPOINT.txt
 37e1d28f294f1263dac88f0af575327d3bcf6204ebb3ace5e94bb56b11317697  ./Docs/CoreBluetoothTransportDesign.md
 90082e1aa6f08daac3af3a57228e18094db1f3fa87edd737632e44829738d4c5  ./Docs/ReadOnlyDiscoveryProbe.md
 867277d3e72bd8d73da273ba1c2ab2154f6e9ad2b745e7b374046e1cd104fa3c  ./Docs/SimulatedTransportDesign.md
@@ -9,8 +9,9 @@ f194cf2e649d2f7a6df3249116a151213b9e5ebc52d20d26baaca4405b108650  ./Docs/TestRep
 a098d5a53ef3311bdd64b1b8ea42141c1d5219832e066e551449e35ab53dc410  ./Docs/TestReport-003-corebluetooth-macOS-arm64.md
 6b8fae0be7b2cd8b6b815a2826f42486963a4958b58dab6586256eb76791c760  ./Docs/TestReport-004-attempt-001-macOS-arm64.md
 96304f1e48ce9a348a5f70322d868d2c092687efdd1f07b26895ce41db5e70b7  ./Docs/TestReport-004-attempt-002-macOS-arm64.md
+a67d258e2216c52d5ec73c70a1a7bb52f53a1a0c797b26f3f125192eb045ec0a  ./Docs/TestReport-004-discovery-probe-macOS-arm64.md
 93a6faec393732d3f4379b49c765d39e18f7c70e919e0b391cef98118b50e1a8  ./Package.swift
-3f2a1d72104ddc3e4e6ded3f6884837a6c9e1657ac1c5628c7c1d0361d2b2b3d  ./README.md
+eebb132dd1efaca957a37729d336a055b6a396e629d524036420269b8ca1b116  ./README.md
 39a4a49a3d85609b0492aed5bfbe680dfc8839e872f33494199dc812ae8a20d3  ./Sources/MicroTechCGMKit/BluetoothIdentifiers.swift
 169a21d6fe9c8678043a4967e915dac899250ca8c033c01f7f211199c9961b2c  ./Sources/MicroTechCGMKit/BluetoothTransport.swift
 62981e7784119b34e054b356abfc868c744f1747e19aea86b508ddee8141743b  ./Sources/MicroTechCGMKit/Checksums.swift
