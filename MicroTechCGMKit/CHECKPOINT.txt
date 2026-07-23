@@ -3,7 +3,9 @@ Feature branch: feature/microtech-smart2-cgm
 Protocol core commit: 63a6b0c
 Simulated transport implementation commit: 98bddbd
 CoreBluetooth bridge implementation commit: 357424f
-Expected XCTest count: 50
+Read-only discovery probe implementation commit: d9a9062
+Expected XCTest count: 57
 macOS phase 2 validation: PASS (41/41, test report 002)
 macOS phase 3 validation: PASS (50/50, test report 003)
+macOS phase 4 validation: PENDING
 Hardware status: not validated
