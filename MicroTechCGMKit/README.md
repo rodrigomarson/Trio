@@ -41,6 +41,13 @@ Alternatively, open `Package.swift` in Xcode and run the `MicroTechCGMKit` packa
 
 CryptoSwift 1.10.0 is pinned to match the dependency currently resolved by Trio's workspace.
 
+Fresh test archives include `CHECKPOINT.txt` and `SOURCE_MANIFEST.sha256`. Before running tests from an automatically extracted Safari download, verify the source files from the package directory:
+
+```sh
+shasum -a 256 -c SOURCE_MANIFEST.sha256
+swift test
+```
+
 ## Validation status
 
 Two Apple Silicon macOS runs built successfully and passed all 25 XCTest cases. The second run used a fresh, checkpoint-specific archive extraction, closing the initial source-identity caveat. See [test report 001](Docs/TestReport-001-macOS-arm64.md).
