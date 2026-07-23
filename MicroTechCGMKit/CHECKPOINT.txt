@@ -3,4 +3,5 @@ Feature branch: feature/microtech-smart2-cgm
 Protocol core commit: 63a6b0c
 Simulated transport implementation commit: 98bddbd
 Expected XCTest count: 41
+macOS synthetic validation: PASS (41/41, test report 002)
 Hardware status: not validated

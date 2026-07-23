@@ -50,9 +50,11 @@ swift test
 
 ## Validation status
 
-Two Apple Silicon macOS runs built successfully and passed all 25 XCTest cases. The second run used a fresh, checkpoint-specific archive extraction, closing the initial source-identity caveat. See [test report 001](Docs/TestReport-001-macOS-arm64.md).
+The protocol core passed all 25 XCTest cases in two Apple Silicon macOS runs. The second run used a fresh, checkpoint-specific archive extraction, closing the initial source-identity caveat. See [test report 001](Docs/TestReport-001-macOS-arm64.md).
 
-The simulated transport design and its hardware-bound assumptions are documented in [SimulatedTransportDesign.md](Docs/SimulatedTransportDesign.md). Its additional unit tests require a new Mac validation run before this phase is marked complete.
+The simulated transport and connection coordinator then passed all 41 XCTest cases from a manifest-verified phase-2 archive on Apple Silicon macOS. See [test report 002](Docs/TestReport-002-simulated-transport-macOS-arm64.md).
+
+The simulated transport design and its hardware-bound assumptions are documented in [SimulatedTransportDesign.md](Docs/SimulatedTransportDesign.md). This phase is complete at the synthetic-test level; hardware validation remains pending.
 
 ## Safety and provenance
 
