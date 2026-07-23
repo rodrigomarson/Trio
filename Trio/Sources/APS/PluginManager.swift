@@ -59,6 +59,11 @@ class BasePluginManager: Injectable, PluginManager {
             pluginIdentifier: AccuChekCgmManager.pluginIdentifier,
             localizedTitle: String(localized: "Accu-Chek SmartGuide"),
             manager: AccuChekCgmManager.self
+        ),
+        CgmPluginDescription(
+            pluginIdentifier: SmartCGMManager.pluginIdentifier,
+            localizedTitle: String(localized: "Smart / LinX (Beta)"),
+            manager: SmartCGMManager.self
         )
     ]
 

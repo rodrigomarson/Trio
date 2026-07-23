@@ -13,6 +13,10 @@ let cgmOptions: [CGMOption] = [
         predicate: { $0.type == .plugin && $0.displayName == "FreeStyle Libre 3 / 3+ (Beta)" }
     ),
     CGMOption(name: "Eversense", predicate: { $0.type == .plugin && $0.displayName == "Eversense" }),
+    CGMOption(
+        name: "Smart / LinX (Beta)",
+        predicate: { $0.type == .plugin && $0.displayName == "Smart / LinX (Beta)" }
+    ),
     CGMOption(name: "Glucose Simulator", predicate: { $0.type == .simulator }),
     CGMOption(name: "Medtronic Enlite", predicate: { $0.type == .enlite }),
     CGMOption(name: "Nightscout as CGM", predicate: { $0.type == .nightscout }),
