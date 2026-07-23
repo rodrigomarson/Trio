@@ -40,7 +40,7 @@ CryptoSwift 1.10.0 is pinned to match the dependency currently resolved by Trio'
 
 ## Validation status
 
-The first Apple Silicon macOS run built successfully and passed all 25 XCTest cases. See [test report 001](Docs/TestReport-001-macOS-arm64.md). Exact source-artifact identity is still being verified because the first submitted terminal sequence used a pre-existing package directory after the requested ZIP was not found.
+Two Apple Silicon macOS runs built successfully and passed all 25 XCTest cases. The second run used a fresh, checkpoint-specific archive extraction, closing the initial source-identity caveat. See [test report 001](Docs/TestReport-001-macOS-arm64.md).
 
 ## Safety and provenance
 

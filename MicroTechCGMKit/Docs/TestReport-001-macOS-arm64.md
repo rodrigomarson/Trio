@@ -4,7 +4,9 @@ Date: 2026-07-14
 
 Feature branch: `feature/microtech-smart2-cgm`
 
-Expected implementation checkpoint: `63a6b0c`
+Protocol-core checkpoint: `63a6b0c`
+
+Tested archive checkpoint: `fc752f2`
 
 Test host: Apple Silicon Mac
 
@@ -16,7 +18,7 @@ Dependency: CryptoSwift `1.10.0`
 
 ## Result
 
-Status: **PASS, with source-identity verification pending**
+Status: **PASS — reproduced from the fresh checkpoint archive**
 
 The Swift package resolved CryptoSwift 1.10.0, completed a debug build, linked `MicroTechCGMKitPackageTests`, and executed all 25 XCTest cases with zero failures or unexpected failures.
 
@@ -30,9 +32,11 @@ The Swift package resolved CryptoSwift 1.10.0, completed a debug build, linked `
 | `SensorSerialTests` | 4 | 0 |
 | **Total** | **25** | **0** |
 
-Reported build time: 13.61 seconds.
+Initial reported build time: 13.61 seconds.
 
-Reported XCTest execution time: 0.005 seconds, 0.007 seconds total.
+Reproducibility-run build time: 13.24 seconds.
+
+Both runs reported 0.005 seconds of XCTest execution and 0.007 seconds total.
 
 ## Behaviors validated
 
@@ -60,7 +64,7 @@ Test run with 0 tests in 0 suites passed
 
 This is expected because this package currently contains XCTest tests, not Swift Testing (`@Test`) tests. It does not invalidate or replace the preceding 25-test XCTest result.
 
-## Source-identity caveat
+## Reproducibility and source identity
 
 The submitted terminal transcript first reported:
 
@@ -70,16 +74,18 @@ unzip: cannot find or open MicroTechCGMKit_experimental_63a6b0c.zip
 
 The following `cd MicroTechCGMKit` command nevertheless succeeded, which means the tests ran from a pre-existing `~/Downloads/MicroTechCGMKit` directory rather than a directory extracted during this command sequence.
 
-The suite names and 25-test count match checkpoint `63a6b0c`, so the result is strong implementation evidence. Exact byte-for-byte identity with the supplied ZIP or git checkpoint remains to be confirmed before this report is treated as a reproducible release-artifact test.
+That first run was therefore treated as provisional even though its suite names and 25-test count matched checkpoint `63a6b0c`.
 
-## Next verification
+The archive for checkpoint `fc752f2` was then downloaded again. Safari automatically extracted it as `~/Downloads/MicroTechCGMKit-2` because a `MicroTechCGMKit` directory already existed. The fresh directory was identified by both:
 
-Repeat the test from either:
+- `Package.swift`; and
+- the checkpoint-specific `Docs/TestReport-001-macOS-arm64.md` file.
 
-1. a freshly extracted copy of `MicroTechCGMKit_experimental_63a6b0c.zip`; or
-2. a Trio clone with commit `63a6b0c` applied on `feature/microtech-smart2-cgm`.
+Running `swift test` in that fresh directory resolved CryptoSwift 1.10.0, rebuilt the package, and repeated all 25 XCTest cases with zero failures or unexpected failures at 2026-07-14 20:49:35 local host time.
 
-Record the package path, git commit when applicable, SHA-256 of the ZIP, Xcode version, Swift version, macOS version, and complete `swift test` result.
+Expected generated ZIP SHA-256: `9616d9218fabff3dedb5e9d609789f0714d198baf41cfc3962ed2ac50c7a882e`. The Mac did not hash the ZIP because Safari automatically extracted the download, but checkpoint identity and reproducible package behavior were independently confirmed from the fresh directory.
+
+Future test archives should include a source manifest inside the extracted directory so Safari auto-extraction does not prevent local integrity verification.
 
 ## Scope limitation
 
