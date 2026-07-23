@@ -17,11 +17,14 @@ It is intentionally embedded in the Trio feature branch while the protocol and h
 - a CoreBluetooth-independent connection coordinator;
 - deterministic new-pairing, reconnect, backfill, timeout, and retry simulation;
 - a fake transport that records BLE commands for unit tests;
+- a platform-independent Bluetooth command/event bridge;
+- a conditional CoreBluetooth driver for Apple-platform compilation and later hardware validation;
 - synthetic unit-test vectors with no captured device keys or personal data.
 
 ## Deliberately excluded
 
-- CoreBluetooth transport and iOS bonding;
+- physical-sensor confirmation of CoreBluetooth services, characteristics, and iOS bonding;
+- Bluetooth state restoration and background execution policy;
 - sensor activation and clock writes;
 - history response parsing until its exact Brazilian packet header is captured;
 - calibration, raw history, OTA, manufacturing parameters, reset, and storage clearing;
@@ -55,6 +58,8 @@ The protocol core passed all 25 XCTest cases in two Apple Silicon macOS runs. Th
 The simulated transport and connection coordinator then passed all 41 XCTest cases from a manifest-verified phase-2 archive on Apple Silicon macOS. See [test report 002](Docs/TestReport-002-simulated-transport-macOS-arm64.md).
 
 The simulated transport design and its hardware-bound assumptions are documented in [SimulatedTransportDesign.md](Docs/SimulatedTransportDesign.md). This phase is complete at the synthetic-test level; hardware validation remains pending.
+
+The next checkpoint adds a platform-independent Bluetooth bridge plus a conditional CoreBluetooth driver. Its design and strict hardware boundary are documented in [CoreBluetoothTransportDesign.md](Docs/CoreBluetoothTransportDesign.md). The 50-test checkpoint still requires compilation and test execution on a Mac before this phase can be marked complete.
 
 ## Safety and provenance
 

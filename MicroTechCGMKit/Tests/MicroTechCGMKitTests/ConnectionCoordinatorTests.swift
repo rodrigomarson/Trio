@@ -7,6 +7,33 @@ final class ConnectionCoordinatorTests: XCTestCase {
     private let masterKeyBytes = [UInt8](hexadecimalString: "2b7e151628aed2a6abf7158809cf4f3c")
     private let sessionKeyBytes = Array(UInt8(0x00) ... UInt8(0x0F))
 
+    func testTransportFailureStopsTheCoordinatorSafely() throws {
+        let serial = try MicroTechSensorSerial("A1B2C3D4E5")
+        var coordinator = MicroTechConnectionCoordinator(serial: serial)
+
+        _ = coordinator.handle(.start)
+        let effects = coordinator.handle(
+            .transportFailed(.characteristicDiscoveryFailed)
+        )
+
+        XCTAssertEqual(
+            coordinator.state,
+            .failed(.transportFailure(.characteristicDiscoveryFailed))
+        )
+        XCTAssertEqual(effects, [.transport(.disconnect)])
+    }
+
+    func testStaleTransportEventsAreIgnoredWhileIdle() throws {
+        let serial = try MicroTechSensorSerial("A1B2C3D4E5")
+        var coordinator = MicroTechConnectionCoordinator(serial: serial)
+
+        XCTAssertTrue(coordinator.handle(.bluetoothUnavailable).isEmpty)
+        XCTAssertTrue(
+            coordinator.handle(.transportFailed(.deviceUnavailable)).isEmpty
+        )
+        XCTAssertEqual(coordinator.state, .idle)
+    }
+
     func testNewPairingSequenceAndEncryptedSynchronizationCommands() throws {
         let serial = try MicroTechSensorSerial("A1B2C3D4E5")
         let crypto = MicroTechProtocolCrypto(serial: serial)

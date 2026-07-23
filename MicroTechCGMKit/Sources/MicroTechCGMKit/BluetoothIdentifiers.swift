@@ -13,6 +13,24 @@ public enum MicroTechCharacteristic: String, CaseIterable, Hashable, Sendable {
     case keyExchange = "0000F001-0000-1000-8000-00805F9B34FB"
     case command = "0000F002-0000-1000-8000-00805F9B34FB"
     case liveGlucose = "0000F003-0000-1000-8000-00805F9B34FB"
+
+    init?(bluetoothUUID: String) {
+        let normalized = bluetoothUUID.uppercased()
+        if let exact = Self.allCases.first(where: { $0.rawValue == normalized }) {
+            self = exact
+            return
+        }
+
+        guard normalized.count == 4,
+              let shortMatch = Self.allCases.first(where: {
+                  $0.rawValue.hasPrefix("0000\(normalized)-")
+              })
+        else {
+            return nil
+        }
+
+        self = shortMatch
+    }
 }
 
 public enum MicroTechDeviceFamily: String, CaseIterable, Equatable, Sendable {

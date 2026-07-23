@@ -3,6 +3,23 @@ import XCTest
 @testable import MicroTechCGMKit
 
 final class DeviceDiscoveryTests: XCTestCase {
+    func testRecognizesShortAndFullCharacteristicUUIDs() {
+        XCTAssertEqual(
+            MicroTechCharacteristic(bluetoothUUID: "f001"),
+            .keyExchange
+        )
+        XCTAssertEqual(
+            MicroTechCharacteristic(
+                bluetoothUUID: MicroTechCharacteristic.command.rawValue.lowercased()
+            ),
+            .command
+        )
+    }
+
+    func testRejectsUnknownCharacteristicUUID() {
+        XCTAssertNil(MicroTechCharacteristic(bluetoothUUID: "F099"))
+    }
+
     func testRecognizesKnownProtocolFamilyNames() throws {
         let cases: [(String, MicroTechDeviceFamily)] = [
             ("Smart-A1B2C3D4E5", .smart),

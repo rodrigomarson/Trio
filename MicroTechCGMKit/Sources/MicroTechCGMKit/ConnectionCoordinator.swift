@@ -38,6 +38,7 @@ public struct MicroTechRetryPolicy: Equatable, Sendable {
 
 public enum MicroTechConnectionFailure: Equatable, Sendable {
     case bluetoothUnavailable
+    case transportFailure(MicroTechTransportFailure)
     case missingCharacteristics(Set<MicroTechCharacteristic>)
     case protocolError(MicroTechProtocolError)
     case unexpectedHistoryPage(expectedStart: UInt16, actualStart: UInt16)
@@ -67,6 +68,7 @@ public enum MicroTechCoordinatorEvent: Equatable, Sendable {
     case start
     case stop
     case bluetoothUnavailable
+    case transportFailed(MicroTechTransportFailure)
     case discovered(MicroTechDiscoveredDevice)
     case connected
     case characteristicsDiscovered(Set<MicroTechCharacteristic>)
@@ -158,7 +160,16 @@ public struct MicroTechConnectionCoordinator: Sendable {
             return [.transport(.disconnect)]
 
         case .bluetoothUnavailable:
+            guard state != .idle else {
+                return []
+            }
             return fail(.bluetoothUnavailable, disconnect: false)
+
+        case let .transportFailed(failure):
+            guard state != .idle else {
+                return []
+            }
+            return fail(.transportFailure(failure), disconnect: true)
 
         case let .discovered(device):
             guard state == .scanning, device.serial == serial else {

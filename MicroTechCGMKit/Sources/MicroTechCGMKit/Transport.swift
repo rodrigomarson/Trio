@@ -11,6 +11,15 @@ public enum MicroTechTransportCommand: Equatable, Sendable {
     case disconnect
 }
 
+public enum MicroTechTransportFailure: Equatable, Sendable {
+    case deviceUnavailable
+    case serviceDiscoveryFailed
+    case characteristicDiscoveryFailed
+    case notificationSetupFailed(MicroTechCharacteristic)
+    case readFailed(MicroTechCharacteristic)
+    case writeFailed(MicroTechCharacteristic)
+}
+
 public protocol MicroTechTransport: AnyObject {
     func perform(_ command: MicroTechTransportCommand)
 }
