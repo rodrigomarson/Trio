@@ -273,8 +273,8 @@ extension ReadOnlyMetadataProbe: CBPeripheralDelegate {
     }
 }
 
-let configuration = ProbeConfiguration(arguments: CommandLine.arguments)
-let probe = ReadOnlyMetadataProbe(configuration: configuration)
+private let configuration = ProbeConfiguration(arguments: CommandLine.arguments)
+private let probe = ReadOnlyMetadataProbe(configuration: configuration)
 withExtendedLifetime(probe) {
     RunLoop.main.run()
 }
