@@ -59,7 +59,7 @@ The simulated transport and connection coordinator then passed all 41 XCTest cas
 
 The simulated transport design and its hardware-bound assumptions are documented in [SimulatedTransportDesign.md](Docs/SimulatedTransportDesign.md). This phase is complete at the synthetic-test level; hardware validation remains pending.
 
-The next checkpoint adds a platform-independent Bluetooth bridge plus a conditional CoreBluetooth driver. Its design and strict hardware boundary are documented in [CoreBluetoothTransportDesign.md](Docs/CoreBluetoothTransportDesign.md). The 50-test checkpoint still requires compilation and test execution on a Mac before this phase can be marked complete.
+The next checkpoint adds a platform-independent Bluetooth bridge plus a conditional CoreBluetooth driver. Its design and strict hardware boundary are documented in [CoreBluetoothTransportDesign.md](Docs/CoreBluetoothTransportDesign.md). The 50-test checkpoint still requires compilation and test execution on a Mac before this phase can be marked complete; use [test plan 003](Docs/TestPlan-003-corebluetooth-macOS.md).
 
 ## Safety and provenance
 
