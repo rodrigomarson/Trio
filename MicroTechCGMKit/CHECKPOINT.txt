@@ -5,5 +5,5 @@ Simulated transport implementation commit: 98bddbd
 CoreBluetooth bridge implementation commit: 357424f
 Expected XCTest count: 50
 macOS phase 2 validation: PASS (41/41, test report 002)
-macOS phase 3 validation: PENDING
+macOS phase 3 validation: PASS (50/50, test report 003)
 Hardware status: not validated
