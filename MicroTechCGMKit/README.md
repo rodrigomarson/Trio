@@ -19,6 +19,7 @@ It is intentionally embedded in the Trio feature branch while the protocol and h
 - a fake transport that records BLE commands for unit tests;
 - a platform-independent Bluetooth command/event bridge;
 - a conditional CoreBluetooth driver for Apple-platform compilation and later hardware validation;
+- a macOS read-only discovery probe that records redacted GATT metadata without reading values or sending protocol commands;
 - synthetic unit-test vectors with no captured device keys or personal data.
 
 ## Deliberately excluded
@@ -62,6 +63,8 @@ The simulated transport design and its hardware-bound assumptions are documented
 The platform-independent Bluetooth bridge and conditional CoreBluetooth driver passed all 50 XCTest cases from a manifest-verified archive on Apple Silicon macOS. This confirms that the real Apple adapter compiles while the synthetic command/event boundary remains deterministic. See [test report 003](Docs/TestReport-003-corebluetooth-macOS-arm64.md).
 
 Its design and strict hardware boundary are documented in [CoreBluetoothTransportDesign.md](Docs/CoreBluetoothTransportDesign.md). Hardware behavior remains unvalidated.
+
+A pre-hardware, metadata-only macOS probe is documented in [ReadOnlyDiscoveryProbe.md](Docs/ReadOnlyDiscoveryProbe.md). It has a separate executable target and privacy-preserving report model. Its 57-test checkpoint and app-bundle build still require Mac validation before the probe is used with a physical sensor.
 
 ## Safety and provenance
 

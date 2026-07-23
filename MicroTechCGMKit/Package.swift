@@ -12,6 +12,10 @@ let package = Package(
         .library(
             name: "MicroTechCGMKit",
             targets: ["MicroTechCGMKit"]
+        ),
+        .executable(
+            name: "MicroTechDiscoveryProbe",
+            targets: ["MicroTechDiscoveryProbe"]
         )
     ],
     dependencies: [
@@ -24,6 +28,10 @@ let package = Package(
         .target(
             name: "MicroTechCGMKit",
             dependencies: ["CryptoSwift"]
+        ),
+        .executableTarget(
+            name: "MicroTechDiscoveryProbe",
+            dependencies: ["MicroTechCGMKit"]
         ),
         .testTarget(
             name: "MicroTechCGMKitTests",

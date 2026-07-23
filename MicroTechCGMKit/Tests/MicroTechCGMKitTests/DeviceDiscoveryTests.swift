@@ -70,6 +70,16 @@ final class DeviceDiscoveryTests: XCTestCase {
         )
     }
 
+    func testRejectsExtraContentBetweenFamilyAndSerial() {
+        XCTAssertNil(
+            MicroTechDiscoveredDevice(
+                identifier: UUID(),
+                localName: "Smart-extra-A1B2C3D4E5",
+                advertisedServiceUUIDs: ["181F"]
+            )
+        )
+    }
+
     func testRejectsInvalidSerialSuffix() {
         XCTAssertNil(
             MicroTechDiscoveredDevice(

@@ -3,7 +3,7 @@ import Foundation
 public enum MicroTechBluetoothIdentifiers {
     public static let service = "0000181F-0000-1000-8000-00805F9B34FB"
 
-    static func isProtocolService(_ value: String) -> Bool {
+    public static func isProtocolService(_ value: String) -> Bool {
         let normalized = value.uppercased()
         return normalized == "181F" || normalized == service
     }
@@ -14,7 +14,7 @@ public enum MicroTechCharacteristic: String, CaseIterable, Hashable, Sendable {
     case command = "0000F002-0000-1000-8000-00805F9B34FB"
     case liveGlucose = "0000F003-0000-1000-8000-00805F9B34FB"
 
-    init?(bluetoothUUID: String) {
+    public init?(bluetoothUUID: String) {
         let normalized = bluetoothUUID.uppercased()
         if let exact = Self.allCases.first(where: { $0.rawValue == normalized }) {
             self = exact
@@ -71,6 +71,12 @@ public struct MicroTechDiscoveredDevice: Equatable, Sendable {
         guard let family = MicroTechDeviceFamily.allCases.first(where: {
             localName.hasPrefix($0.localNamePrefix)
         }) else {
+            return nil
+        }
+
+        let expectedNameLength = family.localNamePrefix.count +
+            MicroTechSensorSerial.requiredLength
+        guard localName.count == expectedNameLength else {
             return nil
         }
 

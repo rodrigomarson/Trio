@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDisplayName</key>
+    <string>MicroTech Discovery Probe</string>
+    <key>CFBundleExecutable</key>
+    <string>MicroTechDiscoveryProbe</string>
+    <key>CFBundleIdentifier</key>
+    <string>org.nightscout.trio.microtech.discovery-probe</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>MicroTechDiscoveryProbe</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>This experimental tool discovers redacted Bluetooth metadata for a user-selected SMART 2.0 sensor without reading values or sending commands.</string>
+    <key>NSBluetoothPeripheralUsageDescription</key>
+    <string>This experimental tool discovers redacted Bluetooth metadata for a user-selected SMART 2.0 sensor without reading values or sending commands.</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+</dict>
+</plist>
