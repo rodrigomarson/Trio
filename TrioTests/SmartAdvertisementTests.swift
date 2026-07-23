@@ -35,6 +35,24 @@ import Testing
         #expect(SmartAdvertisement(manufacturerData: Data(bytes)) == nil)
     }
 
+    @Test("Accepts captured advertisements with trailing transport data")
+    func acceptsTrailingTransportData() throws {
+        let advertisement = try #require(
+            SmartAdvertisement(
+                manufacturerData: try data(
+                    from: "59009D010000026480636580636480640000E8DDD08203F7057236"
+                )
+            )
+        )
+
+        #expect(advertisement.minutesSinceStart == 413)
+        #expect(advertisement.trend == 2)
+        #expect(advertisement.current.glucose == 100)
+        #expect(advertisement.current.quality == 99)
+        #expect(advertisement.current.isValid)
+        #expect(advertisement.previous.map(\.glucose) == [101, 100])
+    }
+
     @Test("Orders current and previous records by session minute") func ordersHistoricalRecords() throws {
         let advertisement = try #require(
             SmartAdvertisement(
