@@ -27,6 +27,16 @@ final class DiscoveryReportTests: XCTestCase {
         )
     }
 
+    func testMalformedKnownFamilyNameDoesNotExposeExtraContent() {
+        let redacted = MicroTechDiscoveryReport.redact(
+            localName: "Smart-extra-A1B2C3D4E5"
+        )
+
+        XCTAssertEqual(redacted, "Smart-<redacted-invalid-local-name>")
+        XCTAssertFalse(redacted.contains("extra"))
+        XCTAssertFalse(redacted.contains("A1B2C3D4E5"))
+    }
+
     func testReportNormalizesAndSortsMetadata() {
         let report = MicroTechDiscoveryReport(
             localName: "Smart-A1B2C3D4E5",

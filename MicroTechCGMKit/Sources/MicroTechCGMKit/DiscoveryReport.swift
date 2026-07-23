@@ -100,12 +100,18 @@ public struct MicroTechDiscoveryReport: Equatable, Sendable {
         }
 
         let suffixLength = MicroTechSensorSerial.requiredLength
-        if localName.count > suffixLength {
+        if let family = MicroTechDeviceFamily.allCases.first(where: {
+            localName.hasPrefix($0.localNamePrefix)
+        }) {
+            let expectedLength = family.localNamePrefix.count + suffixLength
             let suffix = localName.suffix(suffixLength)
-            if suffix.unicodeScalars.allSatisfy(Self.isASCIIAlphanumeric) {
-                return String(localName.dropLast(suffixLength)) +
+            let suffixIsValid = suffix.unicodeScalars
+                .allSatisfy(Self.isASCIIAlphanumeric)
+            if localName.count == expectedLength, suffixIsValid {
+                return family.localNamePrefix +
                     "<redacted-10-character-suffix>"
             }
+            return family.localNamePrefix + "<redacted-invalid-local-name>"
         }
 
         if let separator = localName.lastIndex(of: "-"),

@@ -64,7 +64,7 @@ The platform-independent Bluetooth bridge and conditional CoreBluetooth driver p
 
 Its design and strict hardware boundary are documented in [CoreBluetoothTransportDesign.md](Docs/CoreBluetoothTransportDesign.md). Hardware behavior remains unvalidated.
 
-A pre-hardware, metadata-only macOS probe is documented in [ReadOnlyDiscoveryProbe.md](Docs/ReadOnlyDiscoveryProbe.md). It has a separate executable target and privacy-preserving report model. Its 57-test checkpoint and app-bundle build still require Mac validation before the probe is used with a physical sensor.
+A pre-hardware, metadata-only macOS probe is documented in [ReadOnlyDiscoveryProbe.md](Docs/ReadOnlyDiscoveryProbe.md). It has a separate executable target and privacy-preserving report model. Its 58-test checkpoint and app-bundle build still require Mac validation before the probe is used with a physical sensor.
 
 ## Safety and provenance
 
