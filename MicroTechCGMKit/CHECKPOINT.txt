@@ -5,7 +5,8 @@ Simulated transport implementation commit: 98bddbd
 CoreBluetooth bridge implementation commit: 357424f
 Read-only discovery probe implementation commit: d9a9062
 Discovery probe macOS build fix commit: 6ec3e73
-Expected XCTest count: 57
+Discovery report privacy hardening commit: 80c1d45
+Expected XCTest count: 58
 macOS phase 2 validation: PASS (41/41, test report 002)
 macOS phase 3 validation: PASS (50/50, test report 003)
 macOS phase 4 validation: PENDING

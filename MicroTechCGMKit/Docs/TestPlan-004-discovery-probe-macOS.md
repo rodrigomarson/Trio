@@ -33,7 +33,7 @@ swift test
 - every manifest entry reports `OK`;
 - CryptoSwift resolves at version 1.10.0;
 - the `MicroTechDiscoveryProbe` executable product builds successfully;
-- exactly 57 XCTest cases execute with zero failures;
+- exactly 58 XCTest cases execute with zero failures;
 - the release executable builds successfully;
 - `Info.plist` passes `plutil -lint`;
 - ad-hoc code signing succeeds; and
