@@ -14,6 +14,9 @@ It is intentionally embedded in the Trio feature branch while the protocol and h
 - safe encoding of non-destructive MVP commands;
 - safe decoding of processed live glucose packets;
 - a pure five-minute publication gate for Trio's current dosing-data cadence;
+- a CoreBluetooth-independent connection coordinator;
+- deterministic new-pairing, reconnect, backfill, timeout, and retry simulation;
+- a fake transport that records BLE commands for unit tests;
 - synthetic unit-test vectors with no captured device keys or personal data.
 
 ## Deliberately excluded
@@ -41,6 +44,8 @@ CryptoSwift 1.10.0 is pinned to match the dependency currently resolved by Trio'
 ## Validation status
 
 Two Apple Silicon macOS runs built successfully and passed all 25 XCTest cases. The second run used a fresh, checkpoint-specific archive extraction, closing the initial source-identity caveat. See [test report 001](Docs/TestReport-001-macOS-arm64.md).
+
+The simulated transport design and its hardware-bound assumptions are documented in [SimulatedTransportDesign.md](Docs/SimulatedTransportDesign.md). Its additional unit tests require a new Mac validation run before this phase is marked complete.
 
 ## Safety and provenance
 
