@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		041D1E995A6AE92E9289DC49 /* TreatmentsDataFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8D1A7CA8C10C4403D4BBFA7 /* TreatmentsDataFlow.swift */; };
+		534D41525400000000000001 /* MicroTechCGMKit in Frameworks */ = {isa = PBXBuildFile; productRef = 534D41525400000000000005 /* MicroTechCGMKit */; };
+		534D41525400000000000003 /* SmartCGMManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 534D41525400000000000002 /* SmartCGMManager.swift */; };
 		0437CE46C12535A56504EC19 /* SnoozeRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5822B15939E719628E9FF7C /* SnoozeRootView.swift */; };
 		0D9A5E34A899219C5C4CDFAF /* HistoryStateModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9455FA2D92E77A6C4AFED8A3 /* HistoryStateModel.swift */; };
 		0F7A65FBD2CD8D6477ED4539 /* GlucoseNotificationSettingsProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E625985B47742D498CB1681A /* GlucoseNotificationSettingsProvider.swift */; };
@@ -880,6 +882,7 @@
 
 /* Begin PBXFileReference section */
 		110AEDE02C5193D100615CC9 /* BolusIntent.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BolusIntent.swift; sourceTree = "<group>"; };
+		534D41525400000000000002 /* SmartCGMManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartCGMManager.swift; sourceTree = "<group>"; };
 		110AEDE12C5193D100615CC9 /* BolusIntentRequest.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BolusIntentRequest.swift; sourceTree = "<group>"; };
 		110AEDE52C51A0AE00615CC9 /* ShortcutsConfigView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShortcutsConfigView.swift; sourceTree = "<group>"; };
 		110AEDE72C51A0AE00615CC9 /* ShortcutsConfigDataFlow.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShortcutsConfigDataFlow.swift; sourceTree = "<group>"; };
@@ -1641,6 +1644,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				534D41525400000000000001 /* MicroTechCGMKit in Frameworks */,
 				CE95BF632BA771BE00DC3DE3 /* LoopTestingKit.framework in Frameworks */,
 				3B4BA7722D8DBD690069D5B8 /* G7SensorKitUI.framework in Frameworks */,
 				3B4BA7742D8DBD690069D5B8 /* LibreTransmitter.framework in Frameworks */,
@@ -2369,6 +2373,7 @@
 			isa = PBXGroup;
 			children = (
 				CEE9A65A2BBB41AD00EB5194 /* Calibrations */,
+				534D41525400000000000002 /* SmartCGMManager.swift */,
 				F816825F28DB441800054060 /* BluetoothTransmitter.swift */,
 				F816825D28DB441200054060 /* HeartBeatManager.swift */,
 				38569346270B5DFB0002C50D /* AppGroupSource.swift */,
@@ -3971,6 +3976,7 @@
 			);
 			name = Trio;
 			packageProductDependencies = (
+				534D41525400000000000005 /* MicroTechCGMKit */,
 				3811DE0F25C9D37700A708ED /* Swinject */,
 				38B17B6525DD90E0005CAE3D /* SwiftDate */,
 				3833B46C26012030003021B3 /* Algorithms */,
@@ -4149,6 +4155,7 @@
 			);
 			mainGroup = 388E594F25AD948C0019842D;
 			packageReferences = (
+				534D41525400000000000004 /* XCLocalSwiftPackageReference "MicroTechCGMKit" */,
 				3811DE0E25C9D37700A708ED /* XCRemoteSwiftPackageReference "Swinject" */,
 				38B17B6425DD90E0005CAE3D /* XCRemoteSwiftPackageReference "SwiftDate" */,
 				3833B46B26012030003021B3 /* XCRemoteSwiftPackageReference "swift-algorithms" */,
@@ -4311,6 +4318,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				534D41525400000000000003 /* SmartCGMManager.swift in Sources */,
 				DDA40BBA2F4DB18800257798 /* AlgorithmGlucose.swift in Sources */,
 				DD5DC9F12CF3D97C00AB8703 /* AdjustmentsStateModel+Overrides.swift in Sources */,
 				3811DE2325C9D48300A708ED /* MainDataFlow.swift in Sources */,
@@ -5646,6 +5654,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		534D41525400000000000004 /* XCLocalSwiftPackageReference "MicroTechCGMKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = MicroTechCGMKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		3811DE0E25C9D37700A708ED /* XCRemoteSwiftPackageReference "Swinject" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -5738,6 +5753,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		534D41525400000000000005 /* MicroTechCGMKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 534D41525400000000000004 /* XCLocalSwiftPackageReference "MicroTechCGMKit" */;
+			productName = MicroTechCGMKit;
+		};
 		3811DE0F25C9D37700A708ED /* Swinject */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 3811DE0E25C9D37700A708ED /* XCRemoteSwiftPackageReference "Swinject" */;

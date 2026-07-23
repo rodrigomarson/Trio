@@ -6,6 +6,7 @@ import LibreTransmitter
 import LibreTransmitterUI
 import LoopKit
 import LoopKitUI
+import MicroTechCGMKit
 import Swinject
 
 protocol PluginManager {
@@ -40,6 +41,11 @@ class BasePluginManager: Injectable, PluginManager {
             pluginIdentifier: LibreTransmitterManagerV3.pluginIdentifier,
             localizedTitle: String(localized: "FreeStyle Libre"),
             manager: LibreTransmitterManagerV3.self
+        ),
+        CgmPluginDescription(
+            pluginIdentifier: SmartCGMManager.pluginIdentifier,
+            localizedTitle: String(localized: "SMART MedLevensohn 2.0"),
+            manager: SmartCGMManager.self
         )
     ]
 

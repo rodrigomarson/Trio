@@ -64,6 +64,17 @@ public enum MicroTechConnectionState: Equatable, Sendable {
     case failed(MicroTechConnectionFailure)
 }
 
+/// Selects how the coordinator transitions from authentication to live glucose.
+///
+/// History synchronization remains available for protocol development. Clients
+/// that do not implement MicroTech history response decoding should use
+/// `liveOnly` so authentication cannot stall before live notifications are
+/// published.
+public enum MicroTechSynchronizationMode: Equatable, Sendable {
+    case history
+    case liveOnly
+}
+
 public enum MicroTechCoordinatorEvent: Equatable, Sendable {
     case start
     case stop
@@ -105,6 +116,7 @@ public struct MicroTechConnectionCoordinator: Sendable {
 
     private let crypto: MicroTechProtocolCrypto
     private let retryPolicy: MicroTechRetryPolicy
+    private let synchronizationMode: MicroTechSynchronizationMode
     private var publicationGate: MicroTechPublicationGate
     private var masterKey: MicroTechSecret?
     private var sessionKey: MicroTechSecret?
@@ -116,12 +128,14 @@ public struct MicroTechConnectionCoordinator: Sendable {
         masterKey: MicroTechSecret? = nil,
         lastReceivedMinute: UInt16? = nil,
         lastPublishedMinute: UInt16? = nil,
-        retryPolicy: MicroTechRetryPolicy = MicroTechRetryPolicy()
+        retryPolicy: MicroTechRetryPolicy = MicroTechRetryPolicy(),
+        synchronizationMode: MicroTechSynchronizationMode = .history
     ) {
         self.serial = serial
         self.masterKey = masterKey
         self.lastReceivedMinute = lastReceivedMinute
         self.retryPolicy = retryPolicy
+        self.synchronizationMode = synchronizationMode
         crypto = MicroTechProtocolCrypto(serial: serial)
         publicationGate = MicroTechPublicationGate(lastPublishedMinute: lastPublishedMinute)
     }
@@ -358,6 +372,10 @@ public struct MicroTechConnectionCoordinator: Sendable {
     }
 
     private mutating func beginSynchronization() -> [MicroTechCoordinatorEffect] {
+        if synchronizationMode == .liveOnly {
+            return enterStreaming()
+        }
+
         state = .synchronizing
 
         do {

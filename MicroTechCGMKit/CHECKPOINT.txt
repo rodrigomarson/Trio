@@ -1,15 +1,18 @@
-MicroTechCGMKit pre-hardware checkpoint
-Feature branch: feature/microtech-smart2-cgm
+MicroTechCGMKit Trio production-candidate checkpoint
+Integration branch: feature/smart-production
+Historical feature branch: feature/microtech-smart2-cgm
 Protocol core commit: 63a6b0c
 Simulated transport implementation commit: 98bddbd
 CoreBluetooth bridge implementation commit: 357424f
 Read-only discovery probe implementation commit: d9a9062
 Discovery probe macOS build fix commit: 6ec3e73
 Discovery report privacy hardening commit: 80c1d45
-Expected XCTest count: 58
+Current expected XCTest count: 59
 macOS phase 2 validation: PASS (41/41, test report 002)
 macOS phase 3 validation: PASS (50/50, test report 003)
 macOS phase 4 validation: PASS (58/58, test report 004)
 macOS phase 5 physical discovery: PENDING (sensor required)
-Hardware status: not validated
-Pull request status: LOCAL DRAFT ONLY
+Trio manager/UI integration: IMPLEMENTED, XCODE BUILD PENDING
+Live-only synchronization regression: ADDED, XCODE TEST PENDING
+Hardware status: NOT VALIDATED
+Publication status: LOCAL BRANCH ONLY

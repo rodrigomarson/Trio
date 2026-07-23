@@ -8,6 +8,8 @@ public final class MicroTechCoreBluetoothDriver: NSObject, MicroTechBluetoothDri
     public var eventHandler: ((MicroTechBluetoothDriverEvent) -> Void)?
 
     private let queue: DispatchQueue
+    private let restorationIdentifier: String?
+    private let restoredPeripheralLocalName: String?
     private var pendingScanServiceUUID: String?
     private var discoveredPeripherals: [UUID: CBPeripheral] = [:]
     private var activePeripheral: CBPeripheral?
@@ -16,15 +18,21 @@ public final class MicroTechCoreBluetoothDriver: NSObject, MicroTechBluetoothDri
     private lazy var centralManager = CBCentralManager(
         delegate: self,
         queue: queue,
-        options: nil
+        options: restorationIdentifier.map {
+            [CBCentralManagerOptionRestoreIdentifierKey: $0] as [String: Any]
+        }
     )
 
     public init(
         queue: DispatchQueue = DispatchQueue(
             label: "org.nightscout.trio.microtech-core-bluetooth"
-        )
+        ),
+        restorationIdentifier: String? = nil,
+        restoredPeripheralLocalName: String? = nil
     ) {
         self.queue = queue
+        self.restorationIdentifier = restorationIdentifier
+        self.restoredPeripheralLocalName = restoredPeripheralLocalName
         super.init()
     }
 
@@ -227,6 +235,28 @@ public final class MicroTechCoreBluetoothDriver: NSObject, MicroTechBluetoothDri
 }
 
 extension MicroTechCoreBluetoothDriver: CBCentralManagerDelegate {
+    public func centralManager(
+        _ central: CBCentralManager,
+        willRestoreState dictionary: [String: Any]
+    ) {
+        let peripherals = dictionary[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral] ?? []
+        for peripheral in peripherals {
+            discoveredPeripherals[peripheral.identifier] = peripheral
+            peripheral.delegate = self
+
+            guard let localName = peripheral.name ?? restoredPeripheralLocalName else {
+                continue
+            }
+            emit(
+                .discovered(
+                    identifier: peripheral.identifier,
+                    localName: localName,
+                    advertisedServiceUUIDs: [MicroTechBluetoothIdentifiers.service]
+                )
+            )
+        }
+    }
+
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
         switch central.state {
         case .poweredOn:

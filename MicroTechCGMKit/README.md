@@ -1,8 +1,13 @@
-# MicroTechCGMKit experimental protocol core
+# MicroTechCGMKit SMART integration candidate
 
-This directory contains the pre-hardware, transport-independent protocol core for direct MicroTech GX-01S-family CGM support. The first Brazilian validation target is the MedLevensohn SMART 2.0.
+This directory contains the transport-independent protocol core for direct
+MicroTech GX-01S-family CGM support. The first Brazilian validation target is
+the MedLevensohn SMART 2.0.
 
-It is intentionally embedded in the Trio feature branch while the protocol and hardware behavior are being validated. It is not the proposed final Trio layout. After maintainer agreement, it should become a separately reviewed driver repository and be integrated into Trio as a submodule, matching the existing CGM architecture.
+The package is embedded in the Trio feature branch while physical behavior is
+validated. Trio now includes a selectable `SmartCGMManager` production
+candidate, but compatibility with the Brazilian sensor remains unconfirmed
+until the iPhone hardware test passes.
 
 ## Current scope
 
@@ -19,18 +24,23 @@ It is intentionally embedded in the Trio feature branch while the protocol and h
 - a fake transport that records BLE commands for unit tests;
 - a platform-independent Bluetooth command/event bridge;
 - a conditional CoreBluetooth driver for Apple-platform compilation and later hardware validation;
+- an explicit live-only synchronization mode that does not depend on the
+  unconfirmed history response format;
+- iOS CoreBluetooth state-restoration support for recovered peripherals;
 - a macOS read-only discovery probe that records redacted GATT metadata without reading values or sending protocol commands;
 - synthetic unit-test vectors with no captured device keys or personal data.
 
 ## Deliberately excluded
 
 - physical-sensor confirmation of CoreBluetooth services, characteristics, and iOS bonding;
-- Bluetooth state restoration and background execution policy;
 - sensor activation and clock writes;
 - history response parsing until its exact Brazilian packet header is captured;
 - calibration, raw history, OTA, manufacturing parameters, reset, and storage clearing;
-- LoopKit manager/UI integration;
 - any claim of medical-device compatibility.
+
+The Trio adapter, outside this package, provides onboarding, settings, Keychain
+credential storage, reconnection, background restoration, LoopKit sample
+publication, and sensor removal.
 
 ## Run the tests
 
@@ -68,8 +78,21 @@ A pre-hardware, metadata-only macOS probe is documented in [ReadOnlyDiscoveryPro
 
 The first physical-sensor inspection must follow [test plan 005](Docs/TestPlan-005-physical-discovery-macOS.md). It has explicit stop conditions, prohibits characteristic-value access and protocol commands, and requires review of a redacted metadata report before any later experiment. Record the result using the [test report 005 template](Docs/TestReport-005-template-physical-discovery-macOS.md).
 
-A maintainer-facing [pull-request draft](Docs/PullRequestDraft.md) records the current experimental scope, evidence, exclusions, architecture questions, and hardware acceptance gates. It is a local draft/RFC only; the package is not ready for production Trio integration.
+A maintainer-facing [pull-request draft](Docs/PullRequestDraft.md) preserves the
+pre-integration scope, evidence, exclusions, architecture questions, and
+hardware acceptance gates. It remains a historical local draft/RFC.
+
+The current feature branch adds one synthetic live-only regression test, for a
+total of 59 XCTest cases. The changed sources passed syntax and project-file
+validation in the Linux workspace; XCTest and the signed Trio archive still
+require the macOS/Xcode workflow. Follow
+[the Trio production-candidate test plan](Docs/TrioProductionCandidate.md).
 
 ## Safety and provenance
 
-No experimental output is suitable for treatment decisions or closed-loop dosing. The implementation is written from an interoperability specification and uses standard cryptographic/checksum algorithms plus synthetic fixtures. Do not copy GPL implementation source, comments, tests, naming, or file structure into this package.
+Do not use SMART output for treatment decisions or closed-loop dosing until
+physical readings have been compared successfully with the official SMART app
+or a blood glucose meter. The implementation is written from an
+interoperability specification and uses standard cryptographic/checksum
+algorithms plus synthetic fixtures. Do not copy GPL implementation source,
+comments, tests, naming, or file structure into this package.

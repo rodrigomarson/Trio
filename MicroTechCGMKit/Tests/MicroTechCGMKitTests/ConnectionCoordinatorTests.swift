@@ -159,6 +159,31 @@ final class ConnectionCoordinatorTests: XCTestCase {
         )
     }
 
+    func testLiveOnlyModeEntersStreamingImmediatelyAfterAuthentication() throws {
+        let serial = try MicroTechSensorSerial("A1B2C3D4E5")
+        let masterKey = try MicroTechSecret(keyBytes: masterKeyBytes)
+        let crypto = MicroTechProtocolCrypto(serial: serial)
+        var coordinator = MicroTechConnectionCoordinator(
+            serial: serial,
+            masterKey: masterKey,
+            synchronizationMode: .liveOnly
+        )
+
+        try advanceReconnectToSessionKey(&coordinator, serial: serial)
+        let effects = coordinator.handle(
+            .valueReceived(
+                characteristic: .command,
+                bytes: try encryptedSessionPacket(crypto: crypto)
+            )
+        )
+
+        XCTAssertEqual(coordinator.state, .streaming)
+        XCTAssertEqual(
+            try decryptedCommandFrames(effects, crypto: crypto),
+            [MicroTechCommand.currentGlucose.plaintextFrame]
+        )
+    }
+
     func testMissingRequiredCharacteristicFailsSafely() throws {
         let serial = try MicroTechSensorSerial("A1B2C3D4E5")
         var coordinator = MicroTechConnectionCoordinator(serial: serial)
