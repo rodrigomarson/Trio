@@ -10,4 +10,6 @@ Expected XCTest count: 58
 macOS phase 2 validation: PASS (41/41, test report 002)
 macOS phase 3 validation: PASS (50/50, test report 003)
 macOS phase 4 validation: PASS (58/58, test report 004)
+macOS phase 5 physical discovery: PENDING (sensor required)
 Hardware status: not validated
+Pull request status: LOCAL DRAFT ONLY

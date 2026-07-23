@@ -66,6 +66,10 @@ Its design and strict hardware boundary are documented in [CoreBluetoothTranspor
 
 A pre-hardware, metadata-only macOS probe is documented in [ReadOnlyDiscoveryProbe.md](Docs/ReadOnlyDiscoveryProbe.md). Its separate executable target, privacy-preserving report model, 58-test checkpoint, Debug and Release builds, property list, app-bundle creation, ad-hoc signing, and signature verification all passed on Apple Silicon macOS. See [test report 004](Docs/TestReport-004-discovery-probe-macOS-arm64.md). The probe was not launched, Bluetooth was not accessed, and physical-sensor validation remains pending.
 
+The first physical-sensor inspection must follow [test plan 005](Docs/TestPlan-005-physical-discovery-macOS.md). It has explicit stop conditions, prohibits characteristic-value access and protocol commands, and requires review of a redacted metadata report before any later experiment. Record the result using the [test report 005 template](Docs/TestReport-005-template-physical-discovery-macOS.md).
+
+A maintainer-facing [pull-request draft](Docs/PullRequestDraft.md) records the current experimental scope, evidence, exclusions, architecture questions, and hardware acceptance gates. It is a local draft/RFC only; the package is not ready for production Trio integration.
+
 ## Safety and provenance
 
 No experimental output is suitable for treatment decisions or closed-loop dosing. The implementation is written from an interoperability specification and uses standard cryptographic/checksum algorithms plus synthetic fixtures. Do not copy GPL implementation source, comments, tests, naming, or file structure into this package.
