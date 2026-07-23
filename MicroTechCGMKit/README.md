@@ -38,6 +38,10 @@ Alternatively, open `Package.swift` in Xcode and run the `MicroTechCGMKit` packa
 
 CryptoSwift 1.10.0 is pinned to match the dependency currently resolved by Trio's workspace.
 
+## Validation status
+
+The first Apple Silicon macOS run built successfully and passed all 25 XCTest cases. See [test report 001](Docs/TestReport-001-macOS-arm64.md). Exact source-artifact identity is still being verified because the first submitted terminal sequence used a pre-existing package directory after the requested ZIP was not found.
+
 ## Safety and provenance
 
 No experimental output is suitable for treatment decisions or closed-loop dosing. The implementation is written from an interoperability specification and uses standard cryptographic/checksum algorithms plus synthetic fixtures. Do not copy GPL implementation source, comments, tests, naming, or file structure into this package.
