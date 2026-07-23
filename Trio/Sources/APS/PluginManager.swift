@@ -40,6 +40,11 @@ class BasePluginManager: Injectable, PluginManager {
             pluginIdentifier: LibreTransmitterManagerV3.pluginIdentifier,
             localizedTitle: String(localized: "FreeStyle Libre"),
             manager: LibreTransmitterManagerV3.self
+        ),
+        CgmPluginDescription(
+            pluginIdentifier: SmartCGMManager.pluginIdentifier,
+            localizedTitle: String(localized: "Smart / LinX (Beta)"),
+            manager: SmartCGMManager.self
         )
     ]
 
