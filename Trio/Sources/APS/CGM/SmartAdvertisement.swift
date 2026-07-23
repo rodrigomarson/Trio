@@ -36,9 +36,12 @@ struct SmartAdvertisement: Equatable {
     }
 
     init?(manufacturerData: Data) {
-        guard manufacturerData.count == Self.payloadLength else { return nil }
+        guard manufacturerData.count >= Self.payloadLength else { return nil }
 
-        let bytes = [UInt8](manufacturerData)
+        // Some Smart/LinX firmware appends five transport-specific bytes after
+        // the 22-byte glucose payload. The checksum covers only the protocol
+        // payload, so ignore any trailing transport data.
+        let bytes = [UInt8](manufacturerData.prefix(Self.payloadLength))
         guard Self.uint16(bytes, at: 0) == Self.companyIdentifier else { return nil }
 
         let checksum = Self.uint32(bytes, at: 18)
