@@ -53,6 +53,24 @@ import Testing
         #expect(advertisement.previous.map(\.glucose) == [101, 100])
     }
 
+    @Test("Parses advertisements after the checksum sum overflows 32 bits")
+    func parsesAdvertisementAfterChecksumOverflow() throws {
+        let advertisement = try #require(
+            SmartAdvertisement(
+                manufacturerData: try data(
+                    from: "5900721400000CCE8064CC8064CB80640000D61E90D9"
+                )
+            )
+        )
+
+        #expect(advertisement.minutesSinceStart == 5234)
+        #expect(advertisement.trend == 12)
+        #expect(advertisement.current.glucose == 206)
+        #expect(advertisement.current.quality == 100)
+        #expect(advertisement.current.isValid)
+        #expect(advertisement.previous.map(\.glucose) == [204, 203])
+    }
+
     @Test("Orders current and previous records by session minute") func ordersHistoricalRecords() throws {
         let advertisement = try #require(
             SmartAdvertisement(
