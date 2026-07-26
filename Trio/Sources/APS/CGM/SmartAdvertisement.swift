@@ -74,10 +74,13 @@ struct SmartAdvertisement: Equatable {
 
     private static func calculateChecksum(_ bytes: [UInt8]) -> UInt32 {
         let payload = Array(bytes[2 ..< 18])
-        let sum = stride(from: 0, to: payload.count, by: 4).reduce(UInt64(0)) { partial, offset in
-            partial + UInt64(uint32(payload, at: offset))
+        // The sensor firmware performs this sum in a 32-bit register and
+        // discards the carry before applying the modulus. This matters whenever
+        // the four words add up to more than UInt32.max.
+        let sum = stride(from: 0, to: payload.count, by: 4).reduce(UInt32(0)) { partial, offset in
+            partial &+ uint32(payload, at: offset)
         }
-        var crc = UInt32(sum % 0x7FA777)
+        var crc = sum % 0x7FA777
 
         for byte in payload {
             crc ^= UInt32(byte) << 24
