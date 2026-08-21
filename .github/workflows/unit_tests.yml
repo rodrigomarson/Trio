@@ -1,4 +1,4 @@
-name: zzz [DO NOT RUN] Automated unit tests
+name: Trio and LibreTransmitter tests
 
 on:
   workflow_dispatch:
@@ -38,8 +38,10 @@ jobs:
           fetch-depth: 1
           submodules: recursive
 
-      - name: Apply Brazilian Libre 2 Plus integration patch
-        run: ./ci_scripts/apply_libre_brasil_patch.sh .
+      - name: Apply and validate Brazilian Libre 2 Plus integration patch
+        run: |
+          ./ci_scripts/apply_libre_brasil_patch.sh .
+          ./ci_scripts/validate_libre_brasil_sources.sh .
 
       - name: Restore cache
         id: cache-restore
@@ -69,7 +71,7 @@ jobs:
           time xcodebuild build-for-testing \
             -workspace Trio.xcworkspace \
             -scheme "Trio Tests" \
-            -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2' \
+            -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2'
 
       - name: Check for uncommitted changes
         run: |
@@ -115,6 +117,15 @@ jobs:
             -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2' \
             $([ "$ENABLE_PARALLEL_TESTING" = "true" ] && echo "-parallel-testing-enabled YES") \
             2>&1 | tee xcodebuild.log
+
+      - name: Run LibreTransmitter contract tests
+        run: |
+          set -o pipefail
+          time xcodebuild test \
+            -project LibreTransmitter/LibreTransmitter.xcodeproj \
+            -scheme Shared \
+            -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2' \
+            2>&1 | tee libre-transmitter-xcodebuild.log
 
       - name: Annotate test results
         if: always()

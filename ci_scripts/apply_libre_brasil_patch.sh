@@ -34,4 +34,4 @@ fi
 git -C "$SUBMODULE" apply --check "$PATCH"
 git -C "$SUBMODULE" apply "$PATCH"
 
-echo "Applied the Libre Brazil integration patch."
+echo "Applied the Libre Brazil Gen2 provider-boundary patch."
