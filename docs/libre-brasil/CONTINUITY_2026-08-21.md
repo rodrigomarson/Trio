@@ -22,8 +22,9 @@ de CGM.
 | LibreTransmitter oficial | `20f6d0e171450b294b202cefa8edaf2c5e4a5150` |
 | Branch de trabalho | `rodrigo-v0.8.4-libre-brasil-dev` |
 | Versão / build | `0.8.4` / `18` |
-| Patch LibreTransmitter (SHA-256) | `d1bd510a799409c82a0fa92b75e0b38e85b0e42cf5ba3f2f0e3817a42058582d` |
-| Patch Base64 (SHA-256) | `03a8aeafb4923a91af386be9194d3ab6e5649cd93fbf4cf222a5959c7b878cfb` |
+| Checkpoint de hardening publicado | `445eba22547a908ab854cc05b31a4c03b270d006` |
+| Patch LibreTransmitter (SHA-256) | `6398f1127f4041484d555085e52d645898173305789c5e2db801762bdd030efa` |
+| Patch Base64 (SHA-256) | `dd9713a66c242173f2693eee2687e24909ef9a1503047d2183eced5fb493566c` |
 
 O ponteiro do submódulo permanece exatamente no commit oficial. O delta é
 transportado por `ci_scripts/libre_brasil.patch.b64` e aplicado pelo script
@@ -55,6 +56,8 @@ provedor, habilitam o workflow de testes na branch e alinham a build 18.
   corrida anterior, sem alterar o protocolo europeu.
 - Testes de classificação, regressão europeia, parsing, evidência, limites do
   bridge, normalização fechada e privacidade do diagnóstico.
+- Restauração do alvo real `LibreTransmitterTests`, que havia sido removido do
+  projeto em 2021 embora o esquema compartilhado ainda o referenciasse.
 - Auditoria automática executada no `ci_post_clone.sh` antes da compilação.
 
 ## Evidência de validação reproduzível
@@ -71,8 +74,16 @@ Em um worktree limpo do LibreTransmitter no commit fixado:
 
 Também passaram a sintaxe dos três scripts shell e a verificação de que o
 ponteiro do submódulo continua em `20f6d0e`. Este ambiente não possui Swift nem
-Xcode; compilação, testes XCTest e archive ainda precisam ser executados pelo
-Xcode Cloud ou em um Mac.
+Xcode.
+
+No GitHub Actions, a execução
+[`32533739713`](https://github.com/rodrigomarson/Trio/actions/runs/32533739713)
+compilou o patch no workspace completo do Trio e aprovou 123 testes em 19
+suítes. O passo específico do LibreTransmitter revelou que o esquema apontava
+para um bundle de testes inexistente no `project.pbxproj`; portanto, aqueles
+testes não chegaram a executar. A correção atual restaura o produto `.xctest`,
+a fonte, as fases de build, a dependência do framework e as configurações do
+alvo. Uma nova execução macOS é obrigatória antes de considerar esse gate verde.
 
 ## Reavaliação dos backends em 2026-08-21
 
@@ -95,10 +106,11 @@ com licença compatível que possa ser ligado ao Trio neste checkpoint.
 
 ## Próxima ação operacional
 
-1. Publicar este checkpoint na branch de desenvolvimento.
-2. Executar a build 18 no Xcode Cloud.
-3. Corrigir qualquer incompatibilidade de compilação sem afrouxar os gates de
-   privacidade ou segurança.
+1. Publicar a restauração do alvo de testes na branch de desenvolvimento.
+2. Executar novamente o workflow macOS e exigir que os testes específicos do
+   LibreTransmitter sejam descobertos e aprovados.
+3. Executar a build 18 no Xcode Cloud, sem afrouxar os gates de privacidade ou
+   segurança.
 4. Instalar pelo TestFlight e validar com um sensor reservado a desenvolvimento:
    detecção correta, duas leituras NFC, diagnóstico sanitizado e erro explícito
    de provedor indisponível.

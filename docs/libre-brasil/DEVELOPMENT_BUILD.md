@@ -79,6 +79,9 @@ Primary-source references:
 - Adds unit coverage for profile routing, European regression, response lengths,
   evidence state, bridge limits, unavailable behavior, adapter normalization,
   state-token forwarding, and diagnostic privacy.
+- Restores the concrete `LibreTransmitterTests` unit-test target referenced by
+  the shared Xcode scheme; its source, product, phases, dependency, and build
+  configurations are all checked by the post-clone validator.
 - Runs a source-safety audit after applying the patch in CI.
 
 ## Repository structure
