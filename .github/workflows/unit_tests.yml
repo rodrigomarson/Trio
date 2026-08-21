@@ -1,6 +1,7 @@
 name: zzz [DO NOT RUN] Automated unit tests
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - dev
@@ -24,7 +25,7 @@ jobs:
   test:
     name: Run Unit Tests
     runs-on: macos-26
-    if: github.repository_owner == 'nightscout'
+    if: github.repository_owner == 'nightscout' || github.repository_owner == 'rodrigomarson'
 
     steps:
       - name: Select Xcode version
@@ -35,6 +36,9 @@ jobs:
         with:
           fetch-depth: 1
           submodules: recursive
+
+      - name: Apply Brazilian Libre 2 Plus integration patch
+        run: ./ci_scripts/apply_libre_brasil_patch.sh .
 
       - name: Restore cache
         id: cache-restore
