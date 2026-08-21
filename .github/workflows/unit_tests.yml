@@ -118,14 +118,10 @@ jobs:
             $([ "$ENABLE_PARALLEL_TESTING" = "true" ] && echo "-parallel-testing-enabled YES") \
             2>&1 | tee xcodebuild.log
 
-      - name: Run LibreTransmitter contract tests
+      - name: Verify LibreTransmitter contract tests executed
         run: |
-          set -o pipefail
-          time xcodebuild test \
-            -project LibreTransmitter/LibreTransmitter.xcodeproj \
-            -scheme Shared \
-            -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2' \
-            2>&1 | tee libre-transmitter-xcodebuild.log
+          grep -F "testBrazilLibre2PlusUsesDedicatedNonStreamingProtocol" xcodebuild.log
+          grep -F "testPairingDiagnosticSerializesNoRawSensorBytes" xcodebuild.log
 
       - name: Annotate test results
         if: always()
