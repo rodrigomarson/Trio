@@ -211,7 +211,7 @@
     {
       "identity" : "swift-jwt",
       "kind" : "remoteSourceControl",
-      "location" : "http://github.com/Kitura/Swift-JWT.git",
+      "location" : "https://github.com/Kitura/Swift-JWT.git",
       "state" : {
         "revision" : "f68ec28fbd90a651597e9e825ea7f315f8d52a1f",
         "version" : "4.0.1"
