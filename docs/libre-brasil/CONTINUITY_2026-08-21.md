@@ -23,6 +23,8 @@ de CGM.
 | Branch de trabalho | `rodrigo-v0.8.4-libre-brasil-dev` |
 | Versão / build | `0.8.4` / `18` |
 | Checkpoint de hardening publicado | `445eba22547a908ab854cc05b31a4c03b270d006` |
+| Checkpoint de código testado | `ea096b487b889793690b9e12ac86e1f0226baa51` |
+| GitHub Actions aprovado | [`32535277813`](https://github.com/rodrigomarson/Trio/actions/runs/32535277813) |
 | Patch LibreTransmitter (SHA-256) | `6398f1127f4041484d555085e52d645898173305789c5e2db801762bdd030efa` |
 | Patch Base64 (SHA-256) | `dd9713a66c242173f2693eee2687e24909ef9a1503047d2183eced5fb493566c` |
 
@@ -33,6 +35,8 @@ pós-clone, inclusive no Xcode Cloud.
 Os commits remotos `4d7d964e8`, `31ee8ef81` e `1f82c07f4`, encontrados durante
 a consolidação, foram preservados. Eles registram a primeira fronteira do
 provedor, habilitam o workflow de testes na branch e alinham a build 18.
+O commit concorrente `d7bb54df8`, que hospeda os testes do LibreTransmitter no
+alvo funcional `TrioTests`, também foi preservado integralmente.
 
 ## Entrega consolidada
 
@@ -76,14 +80,21 @@ Também passaram a sintaxe dos três scripts shell e a verificação de que o
 ponteiro do submódulo continua em `20f6d0e`. Este ambiente não possui Swift nem
 Xcode.
 
-No GitHub Actions, a execução
+No GitHub Actions, a execução diagnóstica
 [`32533739713`](https://github.com/rodrigomarson/Trio/actions/runs/32533739713)
 compilou o patch no workspace completo do Trio e aprovou 123 testes em 19
 suítes. O passo específico do LibreTransmitter revelou que o esquema apontava
 para um bundle de testes inexistente no `project.pbxproj`; portanto, aqueles
-testes não chegaram a executar. A correção atual restaura o produto `.xctest`,
-a fonte, as fases de build, a dependência do framework e as configurações do
-alvo. Uma nova execução macOS é obrigatória antes de considerar esse gate verde.
+testes não chegaram a executar.
+
+A correção restaura o produto `.xctest`, a fonte, as fases de build, a
+dependência do framework e as configurações do alvo, e executa a mesma fonte no
+host estável `TrioTests`. A execução final
+[`32535277813`](https://github.com/rodrigomarson/Trio/actions/runs/32535277813),
+sobre `ea096b487`, terminou com sucesso: 16 testes XCTest do LibreTransmitter,
+zero falhas, e 123 testes do Trio em 19 suítes, também sem falhas. O workflow
+confirmou nominalmente os testes de classificação brasileira e privacidade do
+diagnóstico; o log final não contém marcador de falha.
 
 ## Reavaliação dos backends em 2026-08-21
 
@@ -106,14 +117,11 @@ com licença compatível que possa ser ligado ao Trio neste checkpoint.
 
 ## Próxima ação operacional
 
-1. Publicar a restauração do alvo de testes na branch de desenvolvimento.
-2. Executar novamente o workflow macOS e exigir que os testes específicos do
-   LibreTransmitter sejam descobertos e aprovados.
-3. Executar a build 18 no Xcode Cloud, sem afrouxar os gates de privacidade ou
+1. Executar a build 18 no Xcode Cloud, sem afrouxar os gates de privacidade ou
    segurança.
-4. Instalar pelo TestFlight e validar com um sensor reservado a desenvolvimento:
+2. Instalar pelo TestFlight e validar com um sensor reservado a desenvolvimento:
    detecção correta, duas leituras NFC, diagnóstico sanitizado e erro explícito
    de provedor indisponível.
-5. Manter LibreLink e um glicosímetro disponíveis durante todo o teste.
-6. Integrar a próxima camada somente quando existir um backend que satisfaça o
+3. Manter LibreLink e um glicosímetro disponíveis durante todo o teste.
+4. Integrar a próxima camada somente quando existir um backend que satisfaça o
    contrato e os critérios de licença, origem, autorização e teste em dispositivo.
