@@ -15,6 +15,7 @@ on:
   push:
     branches:
       - dev
+      - rodrigo-v0.8.4-libre-brasil-dev
     paths-ignore:
       - '**.md'
       - '**/README'
