@@ -283,6 +283,11 @@ extension PluginSource: CGMManagerDelegate {
                 sensorActivatedAt = cgmTransmitterManager.state.activatedAt
                 sensorStartDate = cgmTransmitterManager.state.activatedAt
                 sensorTransmitterID = cgmTransmitterManager.state.sensorSerial
+            } else if let smartManager = cgmManager as? SmartCGMManager {
+                let metadata = smartManager.sensorMetadata()
+                sensorActivatedAt = metadata.sessionStartDate
+                sensorStartDate = metadata.sessionStartDate
+                sensorTransmitterID = metadata.sensorIdentifier
             }
 
             // Libre 3/3+ only: the sensor flags readings it considers advisory.

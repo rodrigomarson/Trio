@@ -893,8 +893,13 @@ final class BaseNightscoutManager: NightscoutManager, Injectable {
 
     private func performUploadGlucose() async {
         do {
-            try await uploadGlucose(glucoseStorage.getGlucoseNotYetUploadedToNightscout())
-            try await uploadNonCoreDataTreatments(glucoseStorage.getCGMStateNotYetUploadedToNightscout())
+            let glucose = try await glucoseStorage.getGlucoseNotYetUploadedToNightscout()
+            await uploadGlucose(glucose)
+
+            let cgmState = try await glucoseStorage.getCGMStateNotYetUploadedToNightscout()
+            if await uploadNonCoreDataTreatments(cgmState) {
+                await glucoseStorage.markCGMStateUploadedToNightscout(cgmState)
+            }
         } catch {
             debug(
                 .nightscout,
@@ -1006,9 +1011,9 @@ final class BaseNightscoutManager: NightscoutManager, Injectable {
         }
     }
 
-    private func uploadNonCoreDataTreatments(_ treatments: [NightscoutTreatment]) async {
+    @discardableResult private func uploadNonCoreDataTreatments(_ treatments: [NightscoutTreatment]) async -> Bool {
         guard !treatments.isEmpty, let nightscout = nightscoutAPI, isUploadEnabled else {
-            return
+            return false
         }
 
         do {
@@ -1017,8 +1022,10 @@ final class BaseNightscoutManager: NightscoutManager, Injectable {
             }
 
             debug(.nightscout, "Treatments uploaded")
+            return true
         } catch {
             debug(.nightscout, String(describing: error))
+            return false
         }
     }
 

@@ -12,6 +12,7 @@ import Testing
     var testContext: NSManagedObjectContext!
     var fetchGlucoseManager: BaseFetchGlucoseManager!
     var glucoseStorage: BaseGlucoseStorage!
+    @Injected() var calibrationService: CalibrationService!
 
     init() async throws {
         coreDataStack = try await CoreDataStack.createForTests()
@@ -332,6 +333,30 @@ import Testing
             algorithmInput.first?.glucose == 150,
             "Algorithm should have ignored smoothing for a manual entry and used the raw value (150), but used \(algorithmInput.first?.glucose ?? 0)."
         )
+    }
+
+    @Test("Repeated Smart state updates preserve an active calibration") func testRepeatedSmartStateUpdatesPreserveCalibration() {
+        let manager = SmartCGMManager(peripheralIdentifier: UUID())
+        calibrationService.removeAllCalibrations()
+        defer { calibrationService.removeAllCalibrations() }
+
+        fetchGlucoseManager.updateGlucoseSource(
+            cgmGlucoseSourceType: .plugin,
+            cgmGlucosePluginId: SmartCGMManager.pluginIdentifier,
+            newManager: manager
+        )
+        calibrationService.addCalibration(Calibration(x: 150, y: 155))
+
+        for _ in 0 ..< 3 {
+            fetchGlucoseManager.updateGlucoseSource(
+                cgmGlucoseSourceType: .plugin,
+                cgmGlucosePluginId: SmartCGMManager.pluginIdentifier,
+                newManager: manager
+            )
+        }
+
+        #expect(calibrationService.calibrations.count == 1)
+        #expect(calibrationService.calibrate(value: 150) == 155)
     }
 
     // MARK: - Helpers

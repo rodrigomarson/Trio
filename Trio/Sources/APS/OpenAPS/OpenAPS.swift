@@ -223,10 +223,10 @@ final class OpenAPS {
                     return nil
                 }
             // check the first event to see if it's an orphaned resume
-            let firstResumeOrphaned = pumpEventResults.first.flatMap({ event -> [PumpEventStored]? in
+            let firstResumeOrphaned = pumpEventResults.first.flatMap { event -> [PumpEventStored]? in
                 guard event.type == EventType.pumpResume.rawValue else { return nil }
                 return [event]
-            }) ?? []
+            } ?? []
 
             return (firstResumeOrphaned + orphanedResumes).map(\.objectID)
         }
@@ -723,7 +723,9 @@ final class OpenAPS {
     private func loadFileFromStorageAsync(name: String) async -> RawJSON {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                let result = self.storage.retrieveRaw(name) ?? OpenAPS.defaults(for: name)
+                let result = Disk.exists(name, in: .documents)
+                    ? self.storage.retrieveRaw(name) ?? OpenAPS.defaults(for: name)
+                    : OpenAPS.defaults(for: name)
                 continuation.resume(returning: result)
             }
         }

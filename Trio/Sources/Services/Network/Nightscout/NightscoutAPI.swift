@@ -42,6 +42,22 @@ class NightscoutAPI {
 }
 
 extension NightscoutAPI {
+    static func glucoseQueryItems(sinceDate: Date?) -> [URLQueryItem] {
+        var items = [URLQueryItem(name: "count", value: "\(1600)")]
+
+        if let date = sinceDate {
+            let millisecondsSince1970 = Int64(date.timeIntervalSince1970 * 1000)
+            items.append(
+                URLQueryItem(
+                    name: "find[date][$gte]",
+                    value: String(millisecondsSince1970)
+                )
+            )
+        }
+
+        return items
+    }
+
     func checkConnection() -> AnyPublisher<Void, Swift.Error> {
         struct Check: Codable, Equatable {
             var eventType = "Note"
@@ -71,14 +87,7 @@ extension NightscoutAPI {
         components.host = url.host
         components.port = url.port
         components.path = Config.entriesPath
-        components.queryItems = [URLQueryItem(name: "count", value: "\(1600)")]
-        if let date = sinceDate {
-            let dateItem = URLQueryItem(
-                name: "find[dateString][$gte]",
-                value: Formatter.iso8601withFractionalSeconds.string(from: date)
-            )
-            components.queryItems?.append(dateItem)
-        }
+        components.queryItems = Self.glucoseQueryItems(sinceDate: sinceDate)
 
         guard let url = components.url else {
             throw URLError(.badURL)

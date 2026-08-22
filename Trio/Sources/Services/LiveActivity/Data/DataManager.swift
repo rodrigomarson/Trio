@@ -1,6 +1,35 @@
 import CoreData
 import Foundation
 
+enum LiveActivityGlucoseChartPolicy {
+    /// A six-hour window can contain up to 360 one-minute CGM samples.
+    static let maximumFetchedPointCount = 360
+
+    /// The lock-screen chart cannot visually distinguish hundreds of adjacent
+    /// points. Capping the rendered payload keeps ActivityKit updates efficient
+    /// while retaining the newest values and coverage of the complete window.
+    static let maximumRenderedPointCount = 120
+
+    static func pointsForRendering(_ points: [GlucoseData]) -> [GlucoseData] {
+        guard points.count > maximumRenderedPointCount else { return points }
+
+        let newest = Array(points.prefix(2))
+        let older = Array(points.dropFirst(2))
+        let availableSlots = maximumRenderedPointCount - newest.count
+        guard availableSlots > 1, older.count > availableSlots else {
+            return Array(points.prefix(maximumRenderedPointCount))
+        }
+
+        let lastIndex = older.count - 1
+        let sampledOlder = (0 ..< availableSlots).map { slot in
+            let ratio = Double(slot) / Double(availableSlots - 1)
+            let index = Int((ratio * Double(lastIndex)).rounded())
+            return older[index]
+        }
+        return newest + sampledOlder
+    }
+}
+
 // Fetch Data for Glucose and Determination from Core Data and map them to the Structs in order to pass them thread safe to the glucoseDidUpdate/ pushUpdate function
 
 @available(iOS 16.2, *)
@@ -13,7 +42,8 @@ extension LiveActivityManager {
             onContext: context,
             predicate: NSPredicate.predicateForSixHoursAgo,
             key: "date",
-            ascending: false
+            ascending: false,
+            fetchLimit: LiveActivityGlucoseChartPolicy.maximumFetchedPointCount
         )
 
         return try await context.perform {
@@ -21,9 +51,10 @@ extension LiveActivityManager {
                 throw CoreDataError.fetchError(function: #function, file: #file)
             }
 
-            return glucoseResults.map {
+            let points = glucoseResults.map {
                 GlucoseData(glucose: Int($0.glucose), date: $0.date ?? Date(), direction: $0.directionEnum)
             }
+            return LiveActivityGlucoseChartPolicy.pointsForRendering(points)
         }
     }
 

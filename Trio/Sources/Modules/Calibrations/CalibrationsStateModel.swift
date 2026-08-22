@@ -9,6 +9,7 @@ extension Calibrations {
         @ObservationIgnored @Injected() var glucoseStorage: GlucoseStorage!
         @ObservationIgnored @Injected() var calibrationService: CalibrationService!
         @ObservationIgnored @Injected() var trioAlertManager: TrioAlertManager!
+        @ObservationIgnored @Injected() var fetchGlucoseManager: FetchGlucoseManager!
 
         var slope: Double = 1
         var intercept: Double = 1
@@ -16,8 +17,20 @@ extension Calibrations {
         var calibrations: [Calibration] = []
         var calibrate: (Int) -> Double = { Double($0) }
         var items: [Item] = []
+        var isSmartCGM = false
+        var sensorGlucose: Double?
+        var sensorGlucoseDate: Date?
+        var sensorTrendRate: Double?
+        var calibrationReadinessMessage = ""
+        var lastActionMessage: String?
 
         var units: GlucoseUnits = .mgdL
+
+        var canAddCalibration: Bool {
+            guard newCalibration > 0 else { return false }
+            guard isSmartCGM else { return true }
+            return sensorGlucose != nil && calibrationReadinessMessage.isEmpty
+        }
 
         let backgroundContext = CoreDataStack.shared.newTaskContext()
         private let viewContext = CoreDataStack.shared.persistentContainer.viewContext
@@ -26,6 +39,7 @@ extension Calibrations {
             units = settingsManager.settings.units
             calibrate = calibrationService.calibrate
             setupCalibrations()
+            refreshCalibrationCandidate()
         }
 
         private func setupCalibrations() {
@@ -62,11 +76,53 @@ extension Calibrations {
                 defer {
                     UIApplication.shared.endEditing()
                     setupCalibrations()
+                    refreshCalibrationCandidate()
                 }
 
                 var glucose = newCalibration
                 if units == .mmolL {
                     glucose = newCalibration.asMgdL
+                }
+
+                guard glucose >= 40, glucose <= 400 else {
+                    lastActionMessage = "A glicemia de ponta de dedo deve estar entre 40 e 400 mg/dL."
+                    return
+                }
+
+                if isSmartCGM {
+                    guard
+                        let smartManager = fetchGlucoseManager.cgmManager as? SmartCGMManager,
+                        let candidate = smartManager.calibrationSnapshot()
+                    else {
+                        lastActionMessage = "Aguarde uma nova leitura do Smart antes de calibrar."
+                        return
+                    }
+
+                    guard Self.isRecent(candidate.date) else {
+                        lastActionMessage = "A leitura do Smart está antiga. Aguarde uma nova leitura."
+                        return
+                    }
+
+                    guard candidate.trendRate.map({ abs($0) < 2 }) ?? false else {
+                        lastActionMessage =
+                            "A glicemia está mudando rapidamente. Aguarde a tendência estabilizar antes de calibrar."
+                        return
+                    }
+
+                    calibrationService.addCalibration(
+                        Calibration(
+                            x: candidate.glucose,
+                            y: Double(glucose),
+                            date: candidate.date
+                        )
+                    )
+                    let releasedHandoverProtection = smartManager.confirmHandoverAfterFingerstick()
+                    newCalibration = 0
+                    lastActionMessage = releasedHandoverProtection
+                        ?
+                        "Calibração registrada. O novo Smart foi aceito; a insulina automática será retomada após três glicemias dele."
+                        : "Calibração registrada. As próximas leituras usarão o novo ajuste."
+                    return
                 }
 
                 let glucoseValuesIds = try await fetchGlucose()
@@ -78,13 +134,52 @@ extension Calibrations {
                     let calibration = Calibration(x: Double(unfiltered), y: Double(glucose))
 
                     calibrationService.addCalibration(calibration)
+                    newCalibration = 0
+                    lastActionMessage = "Calibração registrada."
                 } else {
                     debug(.service, "Glucose is stale for calibration")
                     issueStaleGlucoseAlert()
+                    lastActionMessage = "Aguarde uma nova leitura do sensor antes de calibrar."
                     return
                 }
             } catch {
                 debug(.default, "\(DebuggingIdentifiers.failed) Failed to add calibration: \(error)")
+                lastActionMessage = "Não foi possível registrar a calibração."
+            }
+        }
+
+        func refreshCalibrationCandidate() {
+            isSmartCGM = fetchGlucoseManager.cgmManager is SmartCGMManager
+            guard isSmartCGM else {
+                sensorGlucose = nil
+                sensorGlucoseDate = nil
+                sensorTrendRate = nil
+                calibrationReadinessMessage = ""
+                return
+            }
+
+            guard
+                let smartManager = fetchGlucoseManager.cgmManager as? SmartCGMManager,
+                let candidate = smartManager.calibrationSnapshot()
+            else {
+                sensorGlucose = nil
+                sensorGlucoseDate = nil
+                sensorTrendRate = nil
+                calibrationReadinessMessage = "Aguardando uma leitura atual do Smart."
+                return
+            }
+
+            sensorGlucose = candidate.glucose
+            sensorGlucoseDate = candidate.date
+            sensorTrendRate = candidate.trendRate
+
+            if !Self.isRecent(candidate.date) {
+                calibrationReadinessMessage = "A leitura do Smart está antiga. Aguarde a próxima leitura."
+            } else if candidate.trendRate.map({ abs($0) < 2 }) != true {
+                calibrationReadinessMessage =
+                    "A glicemia ainda não está estável. Aguarde antes de registrar a ponta de dedo."
+            } else {
+                calibrationReadinessMessage = ""
             }
         }
 
@@ -125,6 +220,11 @@ extension Calibrations {
             let calibration = calibrations[index]
             calibrationService.removeCalibration(calibration)
             setupCalibrations()
+        }
+
+        private static func isRecent(_ date: Date) -> Bool {
+            let age = Date().timeIntervalSince(date)
+            return age >= -120 && age <= .minutes(5)
         }
     }
 }

@@ -180,6 +180,72 @@ import Testing
         #expect(clampedEntries?.count == 1, "Sub-39 backfilled glucose should be clamped and stored as 39")
     }
 
+    @Test("CGM state upload ledger excludes completed treatments") func testCGMStateUploadLedgerPending() {
+        let first = makeSensorChange(date: Date(timeIntervalSince1970: 1000), notes: "first")
+        let second = makeSensorChange(date: Date(timeIntervalSince1970: 2000), notes: "second")
+
+        let pending = CGMStateUploadLedger.pending(
+            all: [second, first],
+            uploaded: [first]
+        )
+
+        #expect(pending == [second])
+    }
+
+    @Test("CGM state upload ledger merges, deduplicates, and prunes") func testCGMStateUploadLedgerMerge() {
+        let now = Date(timeIntervalSince1970: 4_000_000)
+        let expired = makeSensorChange(
+            date: now.addingTimeInterval(-31.days.timeInterval),
+            notes: "expired"
+        )
+        let current = makeSensorChange(
+            date: now.addingTimeInterval(-1.days.timeInterval),
+            notes: "current"
+        )
+
+        let merged = CGMStateUploadLedger.merging(
+            existing: [expired, current],
+            successfullyUploaded: [current],
+            now: now
+        )
+
+        #expect(merged == [current])
+    }
+
+    @Test("Live Activity keeps the complete six-hour chart window") func testLiveActivityChartCoverage() {
+        let newestDate = Date(timeIntervalSince1970: 10000)
+        let points = (0 ..< 360).map { minute in
+            GlucoseData(
+                glucose: 100 + minute % 10,
+                date: newestDate.addingTimeInterval(TimeInterval(-minute * 60)),
+                direction: .flat
+            )
+        }
+
+        let rendered = LiveActivityGlucoseChartPolicy.pointsForRendering(points)
+
+        #expect(rendered.count == LiveActivityGlucoseChartPolicy.maximumRenderedPointCount)
+        #expect(rendered[0].date == points[0].date)
+        #expect(rendered[1].date == points[1].date)
+        #expect(rendered.last?.date == points.last?.date)
+    }
+
+    @Test("Live Activity preserves every Smart point when no reduction is needed") func testLiveActivityKeepsSmartPoints() {
+        let points = (0 ..< 90).map { minute in
+            GlucoseData(
+                glucose: 100,
+                date: Date(timeIntervalSince1970: TimeInterval(minute * 4 * 60)),
+                direction: .flat
+            )
+        }
+
+        let rendered = LiveActivityGlucoseChartPolicy.pointsForRendering(points)
+
+        #expect(rendered.count == points.count)
+        #expect(rendered.first?.date == points.first?.date)
+        #expect(rendered.last?.date == points.last?.date)
+    }
+
     @Test(
         "Test glucose alarms",
         .enabled(if: false, "Flaky test, disabled while investigating")
@@ -279,4 +345,15 @@ import Testing
          // longAvgDelta: only the 30m window: (100–130)/30*5 = –5
          #expect(status!.longAvgDelta == -5)
      }*/
+
+    private func makeSensorChange(date: Date, notes: String) -> NightscoutTreatment {
+        NightscoutTreatment(
+            eventType: .nsSensorChange,
+            createdAt: date,
+            enteredBy: NightscoutTreatment.local,
+            notes: notes,
+            targetTop: nil,
+            targetBottom: nil
+        )
+    }
 }

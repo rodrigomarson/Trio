@@ -1,0 +1,53 @@
+diff --git a/MedtrumKit/PumpManager/PeripheralManager.swift b/MedtrumKit/PumpManager/PeripheralManager.swift
+index 7a9a172..0158029 100644
+--- a/MedtrumKit/PumpManager/PeripheralManager.swift
++++ b/MedtrumKit/PumpManager/PeripheralManager.swift
+@@ -10,0 +11 @@ class PeripheralManager: NSObject {
++    private let completionLock = NSLock()
+@@ -44,0 +46,11 @@ class PeripheralManager: NSObject {
++    /// A connection attempt has several asynchronous failure sources. Finish
++    /// it exactly once so a late Bluetooth callback cannot resume Trio's pump
++    /// continuation a second time.
++    private func finishConnection(_ error: MedtrumConnectError?) {
++        completionLock.lock()
++        let callback = completion
++        completion = nil
++        completionLock.unlock()
++        callback?(error)
++    }
++
+@@ -97 +109 @@ extension PeripheralManager {
+-            completion?(.failedToCompleteAuthorizationFlow(localizedError: error.localizedDescription))
++            finishConnection(.failedToCompleteAuthorizationFlow(localizedError: error.localizedDescription))
+@@ -102 +114 @@ extension PeripheralManager {
+-                completion?(.failedToCompleteAuthorizationFlow(localizedError: "invalid response"))
++                finishConnection(.failedToCompleteAuthorizationFlow(localizedError: "invalid response"))
+@@ -121 +133 @@ extension PeripheralManager {
+-            completion?(.failedToCompleteAuthorizationFlow(localizedError: error.localizedDescription))
++            finishConnection(.failedToCompleteAuthorizationFlow(localizedError: error.localizedDescription))
+@@ -126 +138 @@ extension PeripheralManager {
+-                completion?(.failedToCompleteAuthorizationFlow(localizedError: "invalid response"))
++                finishConnection(.failedToCompleteAuthorizationFlow(localizedError: "invalid response"))
+@@ -143 +155 @@ extension PeripheralManager {
+-            completion?(.failedToCompleteAuthorizationFlow(localizedError: error.localizedDescription))
++            finishConnection(.failedToCompleteAuthorizationFlow(localizedError: error.localizedDescription))
+@@ -150 +162 @@ extension PeripheralManager {
+-            completion?(nil)
++            finishConnection(nil)
+@@ -176 +188 @@ extension PeripheralManager: CBPeripheralDelegate {
+-            completion?(.failedToDiscoverServices(localizedError: error.localizedDescription))
++            finishConnection(.failedToDiscoverServices(localizedError: error.localizedDescription))
+@@ -185 +197 @@ extension PeripheralManager: CBPeripheralDelegate {
+-            completion?(.failedToDiscoverServices(localizedError: localizedError))
++            finishConnection(.failedToDiscoverServices(localizedError: localizedError))
+@@ -195 +207 @@ extension PeripheralManager: CBPeripheralDelegate {
+-            completion?(.failedToDiscoverCharacteristics(localizedError: error.localizedDescription))
++            finishConnection(.failedToDiscoverCharacteristics(localizedError: error.localizedDescription))
+@@ -207 +219 @@ extension PeripheralManager: CBPeripheralDelegate {
+-            completion?(.failedToDiscoverCharacteristics(localizedError: localizedError))
++            finishConnection(.failedToDiscoverCharacteristics(localizedError: localizedError))
+@@ -234,3 +246 @@ extension PeripheralManager: CBPeripheralDelegate {
+-            if let connectCompletion = completion {
+-                connectCompletion(.failedToEnableNotify(localizedError: error.localizedDescription))
+-            }
++            finishConnection(.failedToEnableNotify(localizedError: error.localizedDescription))

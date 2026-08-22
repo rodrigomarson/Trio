@@ -2,6 +2,10 @@ import Foundation
 import LibreTransmitter
 import Swinject
 
+extension Notification.Name {
+    static let smartSensorDidChange = Notification.Name("smartSensorDidChange")
+}
+
 struct Calibration: JSON, Hashable, Identifiable {
     let x: Double
     let y: Double
@@ -33,6 +37,8 @@ final class BaseCalibrationService: CalibrationService, Injectable {
         static let maxIntercept = 100.0
         static let maxValue = 500.0
         static let minValue = 0.0
+        static let minimumRegressionSpan = 20.0
+        static let maximumCalibrationCount = 10
     }
 
     @Injected() var storage: FileStorage!
@@ -52,11 +58,13 @@ final class BaseCalibrationService: CalibrationService, Injectable {
     }
 
     private func subscribe() {
-//        notificationCenter.publisher(for: .newSensorDetected)
-//            .sink { [weak self] _ in
-//                self?.removeAllCalibrations()
-//            }
-//            .store(in: &lifetime)
+        notificationCenter.publisher(for: .smartSensorDidChange)
+            .sink { [weak self] _ in
+                // A calibration describes one physical sensor and must never
+                // be carried into the next Smart session.
+                self?.removeAllCalibrations()
+            }
+            .store(in: &lifetime)
     }
 
     var slope: Double {
@@ -66,9 +74,20 @@ final class BaseCalibrationService: CalibrationService, Injectable {
 
         let xs = calibrations.map(\.x)
         let ys = calibrations.map(\.y)
+        guard
+            let minimumX = xs.min(),
+            let maximumX = xs.max(),
+            maximumX - minimumX >= Config.minimumRegressionSpan
+        else {
+            return 1
+        }
         let sum1 = average(multiply(xs, ys)) - average(xs) * average(ys)
         let sum2 = average(multiply(xs, xs)) - pow(average(xs), 2)
+        guard sum2.isFinite, abs(sum2) > .ulpOfOne else {
+            return 1
+        }
         let slope = sum1 / sum2
+        guard slope.isFinite else { return 1 }
 
         return min(max(slope, Config.minSlope), Config.maxSlope)
     }
@@ -91,6 +110,9 @@ final class BaseCalibrationService: CalibrationService, Injectable {
 
     func addCalibration(_ calibration: Calibration) {
         calibrations.append(calibration)
+        if calibrations.count > Config.maximumCalibrationCount {
+            calibrations.removeFirst(calibrations.count - Config.maximumCalibrationCount)
+        }
     }
 
     func removeCalibration(_ calibration: Calibration) {

@@ -20,6 +20,7 @@ protocol GlucoseStorage {
     func getGlucoseForAlgorithm(shouldSmoothGlucose: Bool, fetchHours: Decimal) async throws -> [BloodGlucose]
     func getGlucoseNotYetUploadedToNightscout() async throws -> [BloodGlucose]
     func getCGMStateNotYetUploadedToNightscout() async throws -> [NightscoutTreatment]
+    func markCGMStateUploadedToNightscout(_ treatments: [NightscoutTreatment]) async
     func getGlucoseNotYetUploadedToHealth() async throws -> [BloodGlucose]
     func getManualGlucoseNotYetUploadedToHealth() async throws -> [BloodGlucose]
     func getGlucoseNotYetUploadedToTidepool() async throws -> [StoredGlucoseSample]
@@ -27,6 +28,28 @@ protocol GlucoseStorage {
 //    func getGlucoseStatus() async throws -> GlucoseStatus? // FIXME: prepared for later use
     var alarm: GlucoseAlarm? { get }
     func deleteGlucose(_ treatmentObjectID: NSManagedObjectID) async
+}
+
+enum CGMStateUploadLedger {
+    static func pending(
+        all: [NightscoutTreatment],
+        uploaded: [NightscoutTreatment]
+    ) -> [NightscoutTreatment] {
+        Array(Set(all).subtracting(Set(uploaded))).sorted {
+            ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast)
+        }
+    }
+
+    static func merging(
+        existing: [NightscoutTreatment],
+        successfullyUploaded: [NightscoutTreatment],
+        now: Date = Date()
+    ) -> [NightscoutTreatment] {
+        let cutoff = now.addingTimeInterval(-30.days.timeInterval)
+        return Array(Set(existing).union(successfullyUploaded))
+            .filter { ($0.createdAt ?? .distantPast) > cutoff }
+            .sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) }
+    }
 }
 
 final class BaseGlucoseStorage: GlucoseStorage, Injectable {
@@ -194,7 +217,7 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
         var existingDates = [Date]()
         do {
             let results = try context.fetch(fetchRequest) as? [NSDictionary]
-            existingDates = results?.compactMap({ $0["date"] as? Date }) ?? []
+            existingDates = results?.compactMap { $0["date"] as? Date } ?? []
         } catch {
             debugPrint("Failed to fetch existing glucose dates: \(error)")
         }
@@ -586,13 +609,36 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
     }
 
     func getCGMStateNotYetUploadedToNightscout() async -> [NightscoutTreatment] {
-        async let alreadyUploaded: [NightscoutTreatment] = storage
-            .retrieveAsync(OpenAPS.Nightscout.uploadedCGMState, as: [NightscoutTreatment].self) ?? []
+        let uploadedFile = OpenAPS.Nightscout.uploadedCGMState
+        let alreadyUploaded: [NightscoutTreatment]
+        if Disk.exists(uploadedFile, in: .documents) {
+            alreadyUploaded = await storage
+                .retrieveAsync(uploadedFile, as: [NightscoutTreatment].self) ?? []
+        } else {
+            alreadyUploaded = []
+        }
         async let allValues: [NightscoutTreatment] = storage
             .retrieveAsync(OpenAPS.Monitor.cgmState, as: [NightscoutTreatment].self) ?? []
 
-        let (alreadyUploadedValues, allValuesSet) = await (alreadyUploaded, allValues)
-        return Array(Set(allValuesSet).subtracting(Set(alreadyUploadedValues)))
+        return await CGMStateUploadLedger.pending(all: allValues, uploaded: alreadyUploaded)
+    }
+
+    func markCGMStateUploadedToNightscout(_ treatments: [NightscoutTreatment]) async {
+        guard treatments.isNotEmpty else { return }
+
+        storage.transaction { storage in
+            let file = OpenAPS.Nightscout.uploadedCGMState
+            let existing = Disk.exists(file, in: .documents)
+                ? storage.retrieve(file, as: [NightscoutTreatment].self) ?? []
+                : []
+            storage.save(
+                CGMStateUploadLedger.merging(
+                    existing: existing,
+                    successfullyUploaded: treatments
+                ),
+                as: file
+            )
+        }
     }
 
     // Fetch glucose that is not uploaded to Nightscout yet
