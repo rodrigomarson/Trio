@@ -428,3 +428,40 @@ extension Double {
         return abs(self - other) <= epsilon
     }
 }
+
+@Suite("Nightscout Glucose Compatibility") struct NightscoutGlucoseCompatibilityTests {
+    @Test("Decode glucose when Nightscout omits dateString") func decodeGlucoseWithoutDateString() throws {
+        let data = Data(
+            #"[{"_id":"nightscout-date-only","sgv":108,"direction":"Flat","date":1787399973000}]"#.utf8
+        )
+
+        let readings = try JSONCoding.decoder.decode([BloodGlucose].self, from: data)
+        let reading = try #require(readings.first)
+
+        #expect(reading.id == "nightscout-date-only")
+        #expect(reading.sgv == 108)
+        #expect(abs(reading.dateString.timeIntervalSince1970 - 1_787_399_973) < 0.001)
+    }
+
+    @Test("Preserve dateString when Nightscout provides it") func decodeGlucoseWithDateString() throws {
+        let data = Data(
+            #"[{"_id":"nightscout-full-date","sgv":109,"direction":"Flat","date":1787399973000,"dateString":"2026-08-22T11:59:33.000Z"}]"#
+                .utf8
+        )
+
+        let readings = try JSONCoding.decoder.decode([BloodGlucose].self, from: data)
+        let reading = try #require(readings.first)
+        let expectedDate = try #require(Date("2026-08-22T11:59:33.000Z"))
+
+        #expect(reading.dateString == expectedDate)
+    }
+
+    @Test("Query incremental glucose by numeric date") func queryIncrementalGlucoseByNumericDate() throws {
+        let sinceDate = Date(timeIntervalSince1970: 1_787_399_973)
+        let queryItems = NightscoutAPI.glucoseQueryItems(sinceDate: sinceDate)
+
+        #expect(queryItems.contains(where: { $0.name == "count" && $0.value == "1600" }))
+        #expect(queryItems.contains(where: { $0.name == "find[date][$gte]" && $0.value == "1787399973000" }))
+        #expect(!queryItems.contains(where: { $0.name.contains("dateString") }))
+    }
+}

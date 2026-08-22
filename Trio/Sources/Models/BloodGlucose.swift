@@ -105,7 +105,21 @@ struct BloodGlucose: JSON, Identifiable, Hashable, Codable {
 
         direction = try container.decodeIfPresent(Direction.self, forKey: .direction)
         date = try container.decode(Decimal.self, forKey: .date)
-        dateString = try container.decode(Date.self, forKey: .dateString)
+        if let decodedDateString = try? container.decode(Date.self, forKey: .dateString) {
+            dateString = decodedDateString
+        } else {
+            // Some Nightscout-compatible servers omit dateString and provide only
+            // the standard Unix timestamp in milliseconds through the date field.
+            let millisecondsSince1970 = NSDecimalNumber(decimal: date).doubleValue
+            guard millisecondsSince1970.isFinite else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .date,
+                    in: container,
+                    debugDescription: "The Nightscout glucose date must be a finite Unix timestamp in milliseconds."
+                )
+            }
+            dateString = Date(timeIntervalSince1970: millisecondsSince1970 / 1000)
+        }
         unfiltered = try container.decodeIfPresent(Decimal.self, forKey: .unfiltered)
         filtered = try container.decodeIfPresent(Decimal.self, forKey: .filtered)
         noise = try container.decodeIfPresent(Int.self, forKey: .noise)

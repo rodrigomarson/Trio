@@ -10,7 +10,7 @@ import UIKit
 
     /// Determines if the current activity needs to be recreated.
     ///
-    /// - Returns: `true` if the activity is dismissed, ended, stale, or has been active for more than 60 minutes; otherwise,
+    /// - Returns: `true` if the activity is dismissed, ended, stale, or is approaching ActivityKit's eight-hour limit; otherwise,
     /// `false`.
     func needsRecreation() -> Bool {
         switch activity.activityState {
@@ -18,12 +18,13 @@ import UIKit
              .ended,
              .stale:
             return true
-        case .active:
+        case .active,
+             .pending:
             break
         @unknown default:
             return true
         }
-        return -activity.attributes.startDate.timeIntervalSinceNow > TimeInterval(60 * 60)
+        return -activity.attributes.startDate.timeIntervalSinceNow > TimeInterval(7 * 60 * 60)
     }
 }
 
@@ -71,6 +72,14 @@ final class LiveActivityData: ObservableObject {
 
     private var data = LiveActivityData()
 
+    /// The last state successfully delivered to ActivityKit.
+    ///
+    /// Several pieces of a loop result arrive independently (glucose, determination,
+    /// IOB, overrides, and temp targets). Keeping the last complete state prevents
+    /// identical ActivityKit updates when more than one publisher reports the same
+    /// logical change.
+    @MainActor private var lastPushedContent: LiveActivityAttributes.ContentState?
+
     /// A Core Data task context.
     let context = CoreDataStack.shared.newTaskContext()
 
@@ -95,12 +104,16 @@ final class LiveActivityData: ObservableObject {
         registerHandler()
         monitorForLiveActivityAuthorizationChanges()
         broadcaster.register(SettingsObserver.self, observer: self)
-        data.objectWillChange.sink { [weak self] in
-            Task { @MainActor in
-                // by the time this runs, the object change is done, so we see the new data here
-                await self?.pushCurrentContent()
+        data.objectWillChange
+            .debounce(for: .seconds(12), scheduler: DispatchQueue.main)
+            .sink { [weak self] in
+                Task { @MainActor in
+                    // By the time the debounce fires, all related loop data has
+                    // normally arrived and the published values have been updated.
+                    await self?.pushCurrentContent()
+                }
             }
-        }.store(in: &subscriptions)
+            .store(in: &subscriptions)
         loadInitialData()
     }
 
@@ -133,7 +146,7 @@ final class LiveActivityData: ObservableObject {
     /// - Parameter _: The updated `TrioSettings`.
     func settingsDidChange(_: TrioSettings) {
         Task { @MainActor in
-            await self.pushCurrentContent()
+            await self.pushCurrentContent(force: true)
         }
     }
 
@@ -243,10 +256,10 @@ final class LiveActivityData: ObservableObject {
     /// Otherwise, it updates the current live activity.
     ///
     /// - Parameter state: The new content state to push to the live activity.
-    @MainActor private func pushUpdate(_ state: LiveActivityAttributes.ContentState) async {
+    @MainActor private func pushUpdate(_ state: LiveActivityAttributes.ContentState) async -> Bool {
         if !settings.useLiveActivity || !systemEnabled {
             await endActivity()
-            return
+            return false
         }
 
         if currentActivity == nil {
@@ -275,7 +288,7 @@ final class LiveActivityData: ObservableObject {
                 // After endActivity(), currentActivity is guaranteed to be nil
                 // No recursive task, but explicitly restart
                 debug(.default, "[LiveActivityManager] Re-pushing update after recreation.")
-                await pushUpdate(state)
+                return await pushUpdate(state)
             } else {
                 let content = ActivityContent(
                     state: state,
@@ -285,8 +298,10 @@ final class LiveActivityData: ObservableObject {
                 if let stillCurrent = self.currentActivity, stillCurrent.activity.id == currentActivity.activity.id {
                     debug(.default, "[LiveActivityManager] Updating current activity: \(stillCurrent.activity.id)")
                     await stillCurrent.activity.update(content)
+                    return true
                 } else {
                     debug(.default, "[LiveActivityManager] Skipped update: currentActivity changed during pushUpdate.")
+                    return false
                 }
             }
         } else {
@@ -344,6 +359,7 @@ final class LiveActivityData: ObservableObject {
                 )
                 await activity.update(updateContent)
                 debug(.default, "[LiveActivityManager] Set initial content for new activity: \(activity.id)")
+                return true
             } catch {
                 debug(
                     .default,
@@ -351,12 +367,13 @@ final class LiveActivityData: ObservableObject {
                 )
                 // Reset currentActivity on error to allow retry on next update
                 currentActivity = nil
+                return false
             }
         }
     }
 
     /// Ends the current live activity and ensures that all unknown activities are terminated.
-    private func endActivity() async {
+    @MainActor private func endActivity() async {
         debug(.default, "[LiveActivityManager] Ending all live activities...")
 
         if let currentActivity {
@@ -364,6 +381,7 @@ final class LiveActivityData: ObservableObject {
             await currentActivity.activity.end(nil, dismissalPolicy: .immediate)
             self.currentActivity = nil
         }
+        lastPushedContent = nil
 
         for unknownActivity in Activity<LiveActivityAttributes>.activities {
             debug(.default, "[LiveActivityManager] Ending unknown activity: \(unknownActivity.id)")
@@ -392,14 +410,14 @@ final class LiveActivityData: ObservableObject {
         debug(.default, "[LiveActivityManager] Waiting additional time for iOS to clean up...")
         try? await Task.sleep(nanoseconds: 1_000_000_000) // 1s additional delay
 
-        await pushCurrentContent()
+        await pushCurrentContent(force: true)
 
         debug(.default, "[LiveActivityManager] Restarted Live Activity from LiveActivityIntent (via iOS Shortcut)")
     }
 }
 
 @available(iOS 16.2, *) extension LiveActivityManager {
-    @MainActor func pushCurrentContent() async {
+    @MainActor func pushCurrentContent(force: Bool = false) async {
         guard let glucose = data.glucoseFromPersistence, let bg = glucose.first else {
             debug(.default, "[LiveActivityManager] pushCurrentContent: no current glucose data available")
             return
@@ -424,6 +442,12 @@ final class LiveActivityData: ObservableObject {
             widgetItems: data.widgetItems
         )
 
-        await pushUpdate(content)
+        if !force, content == lastPushedContent {
+            return
+        }
+
+        if await pushUpdate(content) {
+            lastPushedContent = content
+        }
     }
 }

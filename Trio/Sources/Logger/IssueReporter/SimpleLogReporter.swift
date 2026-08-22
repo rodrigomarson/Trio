@@ -3,14 +3,22 @@ import SwiftDate
 
 final class SimpleLogReporter: IssueReporter {
     private let fileManager = FileManager.default
+    private var fileHandle: FileHandle?
+    private var activeLogDay: Date?
 
-    private var dateFormatter: DateFormatter {
+    private lazy var dateFormatter: DateFormatter = {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
         return dateFormatter
+    }()
+
+    deinit {
+        fileHandle?.closeFile()
     }
 
-    func setup() {}
+    func setup() {
+        prepareLogFile(for: Date())
+    }
 
     func setUserIdentifier(_: String?) {}
 
@@ -20,31 +28,50 @@ final class SimpleLogReporter: IssueReporter {
 
     func log(_ category: String, _ message: String, file: String, function: String, line: UInt) {
         let now = Date()
-        let startOfDay = Calendar.current.startOfDay(for: now)
+        prepareLogFile(for: now)
+
+        let logEntry = "\(dateFormatter.string(from: now)) [\(category)] \(file.file) - \(function) - \(line) - \(message)\n"
+        guard let data = logEntry.data(using: .utf8) else { return }
+        fileHandle?.write(data)
+    }
+
+    /// Opens the current log once and keeps the handle available for subsequent
+    /// writes. The previous implementation reopened the file and queried its
+    /// attributes for every diagnostic line, which was costly during background
+    /// operation.
+    private func prepareLogFile(for date: Date) {
+        let startOfDay = Calendar.current.startOfDay(for: date)
+        if activeLogDay == startOfDay, fileHandle != nil {
+            return
+        }
+
+        fileHandle?.closeFile()
+        fileHandle = nil
 
         if !fileManager.fileExists(atPath: SimpleLogReporter.logDir) {
             try? fileManager.createDirectory(
                 atPath: SimpleLogReporter.logDir,
-                withIntermediateDirectories: false,
+                withIntermediateDirectories: true,
                 attributes: nil
             )
         }
 
-        if !fileManager.fileExists(atPath: SimpleLogReporter.logFile) {
-            createFile(at: startOfDay)
-        } else {
-            if let attributes = try? fileManager.attributesOfItem(atPath: SimpleLogReporter.logFile),
-               let creationDate = attributes[.creationDate] as? Date, creationDate < startOfDay
-            {
-                try? fileManager.removeItem(atPath: SimpleLogReporter.logFilePrev)
-                try? fileManager.moveItem(atPath: SimpleLogReporter.logFile, toPath: SimpleLogReporter.logFilePrev)
-                createFile(at: startOfDay)
-            }
+        if fileManager.fileExists(atPath: SimpleLogReporter.logFile),
+           let attributes = try? fileManager.attributesOfItem(atPath: SimpleLogReporter.logFile),
+           let creationDate = attributes[.creationDate] as? Date,
+           creationDate < startOfDay
+        {
+            try? fileManager.removeItem(atPath: SimpleLogReporter.logFilePrev)
+            try? fileManager.moveItem(atPath: SimpleLogReporter.logFile, toPath: SimpleLogReporter.logFilePrev)
         }
 
-        let logEntry = "\(dateFormatter.string(from: now)) [\(category)] \(file.file) - \(function) - \(line) - \(message)\n"
-        let data = logEntry.data(using: .utf8)!
-        try? data.append(fileURL: URL(fileURLWithPath: SimpleLogReporter.logFile))
+        if !fileManager.fileExists(atPath: SimpleLogReporter.logFile) {
+            createFile(at: startOfDay)
+        }
+
+        fileHandle = FileHandle(forWritingAtPath: SimpleLogReporter.logFile)
+        fileHandle?.seekToEndOfFile()
+        activeLogDay = startOfDay
     }
 
     private func createFile(at date: Date) {

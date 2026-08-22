@@ -22,6 +22,28 @@ protocol TidepoolManager {
     func forceTidepoolDataUpload()
 }
 
+/// Serializes glucose uploads and remembers one follow-up request while an
+/// upload is in flight. This prevents multiple Core Data publishers from
+/// uploading the same still-unmarked glucose samples concurrently.
+actor TidepoolGlucoseUploadCoordinator {
+    private var isUploading = false
+    private var followUpRequested = false
+
+    func perform(_ operation: () async -> Void) async {
+        if isUploading {
+            followUpRequested = true
+            return
+        }
+
+        isUploading = true
+        repeat {
+            followUpRequested = false
+            await operation()
+        } while followUpRequested
+        isUploading = false
+    }
+}
+
 final class BaseTidepoolManager: TidepoolManager, Injectable {
     @Injected() private var broadcaster: Broadcaster!
     @Injected() private var pluginManager: PluginManager!
@@ -36,6 +58,7 @@ final class BaseTidepoolManager: TidepoolManager, Injectable {
     private var resolver: Resolver?
 
     private let processQueue = DispatchQueue(label: "BaseNetworkManager.processQueue")
+    private let glucoseUploadCoordinator = TidepoolGlucoseUploadCoordinator()
 
     /// Pending debounce work item for settings upload; cancelled and rescheduled
     /// each time an observer fires, so rapid changes coalesce into one upload.
@@ -78,16 +101,6 @@ final class BaseTidepoolManager: TidepoolManager, Injectable {
                 .receive(on: queue)
                 .share()
                 .eraseToAnyPublisher()
-
-        glucoseStorage.updatePublisher
-            .receive(on: DispatchQueue.global(qos: .background))
-            .sink { [weak self] _ in
-                guard let self = self else { return }
-                Task {
-                    await self.uploadGlucose()
-                }
-            }
-            .store(in: &subscriptions)
 
         registerHandlers()
     }
@@ -146,14 +159,22 @@ final class BaseTidepoolManager: TidepoolManager, Injectable {
             }
         }.store(in: &subscriptions)
 
-        // This works only for manual Glucose
-        coreDataPublisher?.filteredByEntityName("GlucoseStored").sink { [weak self] _ in
-            guard let self = self else { return }
-            Task { [weak self] in
-                guard let self = self else { return }
-                await self.uploadGlucose()
-            }
-        }.store(in: &subscriptions)
+        // Batch CGM inserts are reported by GlucoseStorage while manual
+        // glucose inserts are reported by Core Data. Merge and debounce both
+        // sources so one stored reading results in one upload request.
+        if let manualGlucosePublisher = coreDataPublisher?
+            .filteredByEntityName("GlucoseStored")
+            .map({ _ in () })
+            .eraseToAnyPublisher()
+        {
+            Publishers.Merge(glucoseStorage.updatePublisher, manualGlucosePublisher)
+                .debounce(for: .seconds(1), scheduler: queue)
+                .sink { [weak self] _ in
+                    guard let self else { return }
+                    Task { await self.uploadGlucose() }
+                }
+                .store(in: &subscriptions)
+        }
 
         // Register for settings that aren't saved from a single editor screen
         broadcaster.register(SettingsObserver.self, observer: self)
@@ -615,38 +636,51 @@ extension BaseTidepoolManager {
 /// Glucose Upload Functionality
 extension BaseTidepoolManager {
     func uploadGlucose() async {
+        await glucoseUploadCoordinator.perform { [weak self] in
+            await self?.performGlucoseUpload()
+        }
+    }
+
+    private func performGlucoseUpload() async {
         do {
             let glucose = try await glucoseStorage.getGlucoseNotYetUploadedToTidepool()
-            uploadGlucose(glucose)
+            await uploadGlucose(glucose)
 
             let manualGlucose = try await glucoseStorage.getManualGlucoseNotYetUploadedToTidepool()
-            uploadGlucose(manualGlucose)
+            await uploadGlucose(manualGlucose)
         } catch {
             debug(.service, "Error fetching glucose data: \(error)")
         }
     }
 
-    func uploadGlucose(_ glucose: [StoredGlucoseSample]) {
+    func uploadGlucose(_ glucose: [StoredGlucoseSample]) async {
         guard !glucose.isEmpty, let tidepoolService = self.tidepoolService else { return }
 
         let chunks = glucose.chunks(ofCount: tidepoolService.glucoseDataLimit ?? 100)
 
-        processQueue.async {
-            for chunk in chunks {
-                tidepoolService.uploadGlucoseData(chunk) { result in
-                    switch result {
-                    case .success:
-                        debug(.nightscout, "Success synchronizing glucose data")
-
-                        // After successful upload, update the isUploadedToTidepool flag in Core Data
-                        Task {
-                            await self.updateGlucoseAsUploaded(glucose)
+        for chunk in chunks {
+            let batch = Array(chunk)
+            let succeeded = await withCheckedContinuation { continuation in
+                processQueue.async {
+                    tidepoolService.uploadGlucoseData(batch) { result in
+                        switch result {
+                        case .success:
+                            debug(.nightscout, "Success synchronizing glucose data")
+                            continuation.resume(returning: true)
+                        case let .failure(error):
+                            debug(.nightscout, "Error synchronizing glucose data: \(String(describing: error))")
+                            continuation.resume(returning: false)
                         }
-                    case let .failure(error):
-                        debug(.nightscout, "Error synchronizing glucose data: \(String(describing: error))")
                     }
                 }
             }
+
+            guard succeeded else { return }
+
+            // Mark only the batch that the service confirmed. Awaiting this
+            // save closes the race in which another publisher could fetch the
+            // same samples before their upload flag was persisted.
+            await updateGlucoseAsUploaded(batch)
         }
     }
 

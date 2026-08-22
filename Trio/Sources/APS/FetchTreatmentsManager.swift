@@ -6,14 +6,18 @@ import Swinject
 
 protocol FetchTreatmentsManager {}
 
-final class BaseFetchTreatmentsManager: FetchTreatmentsManager, Injectable {
-    private let processQueue = DispatchQueue(label: "BaseFetchTreatmentsManager.processQueue")
+final class BaseFetchTreatmentsManager: FetchTreatmentsManager, Injectable, SettingsObserver {
+    private let processQueue = DispatchQueue(label: "BaseFetchTreatmentsManager.processQueue", qos: .utility)
+    @Injected() var broadcaster: Broadcaster!
+    @Injected() var settingsManager: SettingsManager!
     @Injected() var nightscoutManager: NightscoutManager!
     @Injected() var tempTargetsStorage: TempTargetsStorage!
     @Injected() var carbsStorage: CarbsStorage!
 
     private var lifetime = Lifetime()
-    private let timer = DispatchTimer(timeInterval: 1.minutes.timeInterval)
+    private lazy var timer = DispatchTimer(timeInterval: 1.minutes.timeInterval, queue: processQueue)
+    private var timerSubscriptionReady = false
+    private var periodicFetchEnabled: Bool?
     private var backgroundContext = CoreDataStack.shared.newTaskContext()
 
     init(resolver: Resolver) {
@@ -80,7 +84,36 @@ final class BaseFetchTreatmentsManager: FetchTreatmentsManager, Injectable {
                 }
             }
             .store(in: &lifetime)
-        timer.fire()
-        timer.resume()
+        timerSubscriptionReady = true
+        updatePeriodicFetchTimer(
+            isDownloadEnabled: settingsManager.settings.isDownloadEnabled,
+            fireImmediately: true
+        )
+        broadcaster.register(SettingsObserver.self, observer: self)
+    }
+
+    private func updatePeriodicFetchTimer(isDownloadEnabled: Bool, fireImmediately: Bool) {
+        guard timerSubscriptionReady else { return }
+
+        processQueue.async { [weak self] in
+            guard let self else { return }
+            guard self.periodicFetchEnabled != isDownloadEnabled else { return }
+            self.periodicFetchEnabled = isDownloadEnabled
+            if isDownloadEnabled {
+                if fireImmediately {
+                    self.timer.fire()
+                }
+                self.timer.resume()
+            } else {
+                self.timer.suspend()
+            }
+        }
+    }
+
+    func settingsDidChange(_ settings: TrioSettings) {
+        updatePeriodicFetchTimer(
+            isDownloadEnabled: settings.isDownloadEnabled,
+            fireImmediately: settings.isDownloadEnabled
+        )
     }
 }

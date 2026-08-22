@@ -36,6 +36,10 @@ extension BaseNightscoutManager {
     func wireCoreDataSubscribers() {
         coreDataPublisher?
             .filteredByEntityName("OrefDetermination")
+            // A loop can persist suggested and enacted determinations a few
+            // seconds apart. Wait for the complete logical result so both are
+            // included in one device-status upload.
+            .debounce(for: .seconds(5), scheduler: queue)
             .sink { [weak self] _ in self?.requestUpload(.deviceStatus) }
             .store(in: &subscriptions)
 

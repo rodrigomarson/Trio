@@ -61,6 +61,9 @@ final class BaseHealthKitManager: HealthKitManager, Injectable {
     private let queue = DispatchQueue(label: "BaseHealthKitManager.queue", qos: .background)
     private var coreDataPublisher: AnyPublisher<Set<NSManagedObjectID>, Never>?
     private var subscriptions = Set<AnyCancellable>()
+    private let glucoseUploadStateQueue = DispatchQueue(label: "BaseHealthKitManager.glucoseUploadState")
+    private var isGlucoseUploadRunning = false
+    private var isGlucoseUploadPending = false
 
     var isAvailableOnCurrentDevice: Bool {
         HKHealthStore.isHealthDataAvailable()
@@ -156,6 +159,32 @@ final class BaseHealthKitManager: HealthKitManager, Injectable {
     // Glucose Upload
 
     func uploadGlucose() async {
+        let shouldStart = glucoseUploadStateQueue.sync {
+            if isGlucoseUploadRunning {
+                isGlucoseUploadPending = true
+                return false
+            }
+            isGlucoseUploadRunning = true
+            return true
+        }
+        guard shouldStart else { return }
+
+        while true {
+            await performGlucoseUploadPass()
+
+            let shouldRepeat = glucoseUploadStateQueue.sync {
+                if isGlucoseUploadPending {
+                    isGlucoseUploadPending = false
+                    return true
+                }
+                isGlucoseUploadRunning = false
+                return false
+            }
+            if !shouldRepeat { break }
+        }
+    }
+
+    private func performGlucoseUploadPass() async {
         do {
             let glucose = try await glucoseStorage.getGlucoseNotYetUploadedToHealth()
             await uploadGlucose(glucose)

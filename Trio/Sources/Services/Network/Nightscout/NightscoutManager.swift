@@ -53,7 +53,7 @@ final class BaseNightscoutManager: NightscoutManager, Injectable {
     /// coalesce into a single upload run for that pipeline.
     let uploadPipelineInterval: [NightscoutUploadPipeline: TimeInterval] = [
         .carbs: 2, .pumpHistory: 2, .overrides: 2, .tempTargets: 2,
-        .glucose: 2, .deviceStatus: 2
+        .glucose: 2, .deviceStatus: 5
     ]
 
     /// Subjects used to request an upload pipeline. The pipeline applies a throttle so
@@ -761,8 +761,13 @@ final class BaseNightscoutManager: NightscoutManager, Injectable {
 
     func uploadGlucose() async {
         do {
-            try await uploadGlucose(glucoseStorage.getGlucoseNotYetUploadedToNightscout())
-            try await uploadNonCoreDataTreatments(glucoseStorage.getCGMStateNotYetUploadedToNightscout())
+            let glucose = try await glucoseStorage.getGlucoseNotYetUploadedToNightscout()
+            await uploadGlucose(glucose)
+
+            let cgmState = try await glucoseStorage.getCGMStateNotYetUploadedToNightscout()
+            if await uploadNonCoreDataTreatments(cgmState) {
+                await glucoseStorage.markCGMStateUploadedToNightscout(cgmState)
+            }
         } catch {
             debug(
                 .nightscout,
@@ -860,9 +865,9 @@ final class BaseNightscoutManager: NightscoutManager, Injectable {
         }
     }
 
-    private func uploadNonCoreDataTreatments(_ treatments: [NightscoutTreatment]) async {
+    @discardableResult private func uploadNonCoreDataTreatments(_ treatments: [NightscoutTreatment]) async -> Bool {
         guard !treatments.isEmpty, let nightscout = nightscoutAPI, isUploadEnabled else {
-            return
+            return false
         }
 
         do {
@@ -871,8 +876,10 @@ final class BaseNightscoutManager: NightscoutManager, Injectable {
             }
 
             debug(.nightscout, "Treatments uploaded")
+            return true
         } catch {
             debug(.nightscout, String(describing: error))
+            return false
         }
     }
 

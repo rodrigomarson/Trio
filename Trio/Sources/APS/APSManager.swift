@@ -40,6 +40,8 @@ enum APSError: LocalizedError {
     case pumpError(Error)
     case invalidPumpState(message: String)
     case glucoseError(message: String)
+    case glucoseDataPending(message: String)
+    case automaticInsulinBlocked(message: String)
     case apsError(message: String)
     case manualBasalTemp(message: String)
 
@@ -51,6 +53,10 @@ enum APSError: LocalizedError {
             return String(localized: "Invalid Pump State (\(message)).")
         case let .glucoseError(message):
             return String(localized: "Invalid Glucose (\(message)).")
+        case let .glucoseDataPending(message):
+            return message
+        case let .automaticInsulinBlocked(message):
+            return message
         case let .apsError(message):
             return String(localized: "Invalid Algorithm Response (\(message)).")
         case let .manualBasalTemp(message):
@@ -67,6 +73,16 @@ enum APSError: LocalizedError {
             .contains("PumpMessage") || message
             .contains("PumpOpsError") || message.contains("RileyLink") || message
             .contains(String(localized: "Pump did not respond in time"))
+    }
+
+    var shouldPostNotification: Bool {
+        if case .glucoseDataPending = self {
+            return false
+        }
+        if case .automaticInsulinBlocked = self {
+            return false
+        }
+        return true
     }
 }
 
@@ -312,6 +328,10 @@ final class BaseAPSManager: APSManager, Injectable {
     }
 
     private func executeLoop(loopStatRecord: inout LoopStats) async throws {
+        if settings.closedLoop, let message = CGMAutomaticInsulinSafetyInterlock.blockingMessage {
+            throw APSError.automaticInsulinBlocked(message: message)
+        }
+
         try await determineBasal()
 
         // Handle open loop
@@ -447,6 +467,7 @@ final class BaseAPSManager: APSManager, Injectable {
         let glucose = try await fetchGlucose(predicate: NSPredicate.predicateForOneHourAgo, fetchLimit: 6)
 
         var invalidGlucoseError: String?
+        var glucoseDataIsPending = false
 
         // Perform the context-related checks and actions
         let isValidGlucoseData = await privateContext.perform { [weak self] in
@@ -454,9 +475,10 @@ final class BaseAPSManager: APSManager, Injectable {
 
             guard glucose.count > 2 else {
                 debug(.apsManager, "Not enough glucose data")
+                glucoseDataIsPending = true
                 invalidGlucoseError =
                     String(
-                        localized: "Not enough glucose data. You need at least three glucose readings in the last six hours to run the algorithm."
+                        localized: "Trio is waiting for at least three recent glucose readings before running the algorithm."
                     )
                 return false
             }
@@ -508,7 +530,9 @@ final class BaseAPSManager: APSManager, Injectable {
             // determineBasal to try to get IoB and CoB updates but we
             // know that it will fail, so the invalidGlucoseError always
             // takes priority
-            if let invalidGlucoseError = invalidGlucoseError {
+            if glucoseDataIsPending, let invalidGlucoseError {
+                throw APSError.glucoseDataPending(message: invalidGlucoseError)
+            } else if let invalidGlucoseError = invalidGlucoseError {
                 throw APSError.apsError(message: invalidGlucoseError)
             } else {
                 throw APSError.apsError(message: "Error determining basal: \(error.localizedDescription)")
@@ -555,6 +579,12 @@ final class BaseAPSManager: APSManager, Injectable {
 
     func enactBolus(amount: Double, isSMB: Bool, callback: ((Bool, String) -> Void)?) async {
         if amount <= 0 {
+            return
+        }
+
+        if isSMB, let message = CGMAutomaticInsulinSafetyInterlock.blockingMessage {
+            processError(APSError.automaticInsulinBlocked(message: message))
+            callback?(false, message)
             return
         }
 
@@ -704,6 +734,10 @@ final class BaseAPSManager: APSManager, Injectable {
     }
 
     private func enactDetermination() async throws {
+        if let message = CGMAutomaticInsulinSafetyInterlock.blockingMessage {
+            throw APSError.automaticInsulinBlocked(message: message)
+        }
+
         guard let determinationID = try await determinationStorage
             .fetchLastDeterminationObjectID(predicate: NSPredicate.predicateFor30MinAgoForDetermination).first
         else {

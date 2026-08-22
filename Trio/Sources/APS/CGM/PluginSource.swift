@@ -229,6 +229,11 @@ extension PluginSource: CGMManagerDelegate {
                 sensorActivatedAt = cgmTransmitterManager.sensorActivatedAt
                 sensorStartDate = cgmTransmitterManager.sensorActivatedAt
                 sensorTransmitterID = cgmTransmitterManager.sensorName
+            } else if let smartManager = cgmManager as? SmartCGMManager {
+                let metadata = smartManager.sensorMetadata()
+                sensorActivatedAt = metadata.sessionStartDate
+                sensorStartDate = metadata.sessionStartDate
+                sensorTransmitterID = metadata.sensorIdentifier
             }
 
             let bloodGlucose = values.compactMap { newGlucoseSample -> BloodGlucose? in
