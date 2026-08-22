@@ -69,4 +69,20 @@ import Testing
     @Test("commsTransient is dwell-suppressed") func commsTransientDoesNotFireImmediately() {
         #expect(TrioAlertCategory.commsTransient.shouldFireImmediately == false)
     }
+
+    @Test("pending glucose and the automatic-insulin safety hold stay silent") func expectedAPSErrorNotificationPolicy() {
+        #expect(APSError.glucoseDataPending(message: "Waiting for current glucose").shouldPostNotification == false)
+        #expect(APSError.automaticInsulinBlocked(message: "Sensor transition safety hold").shouldPostNotification == false)
+        #expect(APSError.glucoseError(message: "Missing glucose").shouldPostNotification == true)
+    }
+
+    @Test("pending glucose and the automatic-insulin safety hold share the glucose-data bucket") func expectedAPSErrorCategories() {
+        #expect(
+            TrioAlertClassifier.categorize(error: APSError.glucoseDataPending(message: "Waiting")) == .glucoseDataStale
+        )
+        #expect(
+            TrioAlertClassifier.categorize(error: APSError.automaticInsulinBlocked(message: "Safety hold")) ==
+                .glucoseDataStale
+        )
+    }
 }

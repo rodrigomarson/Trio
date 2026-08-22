@@ -136,7 +136,9 @@ enum TrioAlertClassifier {
                 return categorize(pumpError: inner)
             case .invalidPumpState:
                 return .hardwareFault
-            case .glucoseError:
+            case .automaticInsulinBlocked,
+                 .glucoseDataPending,
+                 .glucoseError:
                 return .glucoseDataStale
             case .apsError:
                 return .algorithmError

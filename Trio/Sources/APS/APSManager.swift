@@ -75,6 +75,19 @@ enum APSError: LocalizedError {
             return String(localized: "Manual Temporary Basal Rate (\(message)). Looping suspended.")
         }
     }
+
+    /// Pending glucose and the temporary automatic-insulin safety hold are
+    /// expected control-flow states. They remain visible in Trio without
+    /// producing a notification on every loop attempt.
+    var shouldPostNotification: Bool {
+        switch self {
+        case .automaticInsulinBlocked,
+             .glucoseDataPending:
+            return false
+        default:
+            return true
+        }
+    }
 }
 
 // MARK: - Thread-safe loop serialization
@@ -96,16 +109,6 @@ private actor LoopGuard {
 
     func finish() {
         isRunning = false
-    }
-
-    var shouldPostNotification: Bool {
-        if case .glucoseDataPending = self {
-            return false
-        }
-        if case .automaticInsulinBlocked = self {
-            return false
-        }
-        return true
     }
 }
 
@@ -1331,6 +1334,11 @@ final class BaseAPSManager: APSManager, Injectable {
     }
 
     private func surfaceErrorIfNeeded(_ error: Error) {
+        if let apsError = error as? APSError, !apsError.shouldPostNotification {
+            debug(.apsManager, "APSManager retained expected state without issuing an alert: \(apsError)")
+            return
+        }
+
         let category = TrioAlertClassifier.categorize(error: error)
         let key = String(describing: category)
 
@@ -1406,6 +1414,8 @@ final class BaseAPSManager: APSManager, Injectable {
                 )
             case let .invalidPumpState(message): return (String(localized: "Pump State Error"), message)
             case let .glucoseError(message): return (String(localized: "Glucose Error"), message)
+            case let .glucoseDataPending(message): return (String(localized: "Glucose Data Pending"), message)
+            case let .automaticInsulinBlocked(message): return (String(localized: "Automatic Insulin Paused"), message)
             case let .apsError(message): return (String(localized: "Algorithm Error"), message)
             case let .manualBasalTemp(message): return (String(localized: "Manual Temp Basal Active"), message)
             }

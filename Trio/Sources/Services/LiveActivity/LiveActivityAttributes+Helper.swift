@@ -137,7 +137,9 @@ extension LiveActivityAttributes.ContentState {
             bg: formattedBG,
             direction: trendString,
             change: change,
-            date: determination?.date ?? nil,
+            // A glucose update is sufficient to keep the activity current while
+            // the matching determination is still being persisted.
+            date: determination?.date ?? bg.date,
             highGlucose: settings.high,
             lowGlucose: settings.low,
             target: determination?.target ?? 100 as Decimal,

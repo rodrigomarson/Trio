@@ -5,26 +5,44 @@ import Foundation
 import Swinject
 import UIKit
 
+@available(iOS 16.2, *) enum LiveActivityUpdatePolicy {
+    static let freshnessWindow: TimeInterval = 12 * 60
+    static let maximumActivityAge: TimeInterval = 7 * 60 * 60
+
+    static func staleDate(now: Date = .now) -> Date {
+        now.addingTimeInterval(freshnessWindow)
+    }
+
+    static func shouldRecreate(activityState: ActivityState, startDate: Date, now: Date = .now) -> Bool {
+        switch activityState {
+        case .dismissed,
+             .ended:
+            return true
+        case .active,
+             .pending,
+             .stale:
+            break
+        @unknown default:
+            return true
+        }
+
+        return now.timeIntervalSince(startDate) > maximumActivityAge
+    }
+}
+
 @available(iOS 16.2, *) private struct ActiveActivity {
     let activity: Activity<LiveActivityAttributes>
 
     /// Determines if the current activity needs to be recreated.
     ///
-    /// - Returns: `true` if the activity is dismissed, ended, stale, or is approaching ActivityKit's eight-hour limit; otherwise,
-    /// `false`.
-    func needsRecreation() -> Bool {
-        switch activity.activityState {
-        case .dismissed,
-             .ended,
-             .stale:
-            return true
-        case .active,
-             .pending:
-            break
-        @unknown default:
-            return true
-        }
-        return -activity.attributes.startDate.timeIntervalSinceNow > TimeInterval(7 * 60 * 60)
+    /// A stale activity remains updateable. Recreating it on every delayed CGM
+    /// reading can leave an expired placeholder on the Lock Screen.
+    func needsRecreation(now: Date = .now) -> Bool {
+        LiveActivityUpdatePolicy.shouldRecreate(
+            activityState: activity.activityState,
+            startDate: activity.attributes.startDate,
+            now: now
+        )
     }
 }
 
@@ -79,6 +97,11 @@ final class LiveActivityData: ObservableObject {
     /// identical ActivityKit updates when more than one publisher reports the same
     /// logical change.
     @MainActor private var lastPushedContent: LiveActivityAttributes.ContentState?
+
+    /// Coalesces notifications that arrive while an ActivityKit operation is in progress.
+    @MainActor private var pendingContent: LiveActivityAttributes.ContentState?
+    @MainActor private var pendingForce = false
+    @MainActor private var isProcessingUpdate = false
 
     /// A Core Data task context.
     let context = CoreDataStack.shared.newTaskContext()
@@ -244,6 +267,7 @@ final class LiveActivityData: ObservableObject {
                     await MainActor.run {
                         systemEnabled = activityState
                     }
+                    await pushCurrentContent(force: true)
                 }
             }
         }
@@ -257,7 +281,11 @@ final class LiveActivityData: ObservableObject {
     /// - Parameter state: The new content state to push to the live activity.
     @MainActor private func pushUpdate(_ state: LiveActivityAttributes.ContentState) async -> Bool {
         if !settings.useLiveActivity || !systemEnabled {
-            await endActivity()
+            if currentActivity != nil || !Activity<LiveActivityAttributes>.activities.isEmpty {
+                await endActivity()
+            } else {
+                lastPushedContent = nil
+            }
             return false
         }
 
@@ -273,10 +301,12 @@ final class LiveActivityData: ObservableObject {
             }
         }
 
-        // End all unknown activities except the current one
-        for unknownActivity in Activity<LiveActivityAttributes>.activities
-            .filter({ self.currentActivity?.activity.id != $0.id })
-        {
+        let unknownActivities = Activity<LiveActivityAttributes>.activities
+            .filter { self.currentActivity?.activity.id != $0.id }
+        if !unknownActivities.isEmpty {
+            debug(.default, "[LiveActivityManager] Ending \(unknownActivities.count) duplicate live activity instance(s).")
+        }
+        for unknownActivity in unknownActivities {
             await unknownActivity.end(nil, dismissalPolicy: .immediate)
         }
 
@@ -284,18 +314,17 @@ final class LiveActivityData: ObservableObject {
             if currentActivity.needsRecreation(), UIApplication.shared.applicationState == .active {
                 debug(.default, "[LiveActivityManager] Ending current activity for recreation: \(currentActivity.activity.id)")
                 await endActivity()
-                // After endActivity(), currentActivity is guaranteed to be nil
-                // No recursive task, but explicitly restart
-                debug(.default, "[LiveActivityManager] Re-pushing update after recreation.")
-                return await pushUpdate(state)
+            } else if currentActivity.needsRecreation() {
+                // Activity creation is unreliable while Trio is in the background.
+                // didBecomeActive will retry using the newest queued content.
+                return false
             } else {
                 let content = ActivityContent(
                     state: state,
-                    staleDate: min(state.date ?? Date.now, Date.now).addingTimeInterval(360)
+                    staleDate: LiveActivityUpdatePolicy.staleDate()
                 )
                 // Before the update, check if currentActivity is still valid
                 if let stillCurrent = self.currentActivity, stillCurrent.activity.id == currentActivity.activity.id {
-                    debug(.default, "[LiveActivityManager] Updating current activity: \(stillCurrent.activity.id)")
                     await stillCurrent.activity.update(content)
                     return true
                 } else {
@@ -303,95 +332,60 @@ final class LiveActivityData: ObservableObject {
                     return false
                 }
             }
-        } else {
-            // ... Activity is newly created ...
-            do {
-                let expired = ActivityContent(
-                    state: LiveActivityAttributes
-                        .ContentState(
-                            unit: settings.units.rawValue,
-                            bg: "--",
-                            direction: nil,
-                            change: "--",
-                            date: Date.now,
-                            highGlucose: settings.high,
-                            lowGlucose: settings.low,
-                            target: data.determination?.target ?? 100 as Decimal,
-                            glucoseColorScheme: settings.glucoseColorScheme.rawValue,
-                            useDetailedViewIOS: false,
-                            useDetailedViewWatchOS: false,
-                            detailedViewState: LiveActivityAttributes.ContentAdditionalState(
-                                chart: [],
-                                rotationDegrees: 0,
-                                cob: 0,
-                                iob: 0,
-                                tdd: 0,
-                                isOverrideActive: false,
-                                overrideName: "",
-                                overrideDate: Date.now,
-                                overrideDuration: 0,
-                                overrideTarget: 0,
-                                isTempTargetActive: false,
-                                tempTargetName: "",
-                                tempTargetDate: Date.now,
-                                tempTargetDuration: 0,
-                                tempTargetTarget: 0,
-                                widgetItems: [],
-                                minForecast: [],
-                                maxForecast: [],
-                                forecastLines: [],
-                                forecastDisplayType: ForecastDisplayType.cone.rawValue
-                            ),
-                            isInitialState: true
-                        ),
-                    staleDate: Date.now.addingTimeInterval(60)
-                )
+        }
 
-                let activity = try Activity.request(
-                    attributes: LiveActivityAttributes(startDate: Date.now),
-                    content: expired,
-                    pushType: nil
-                )
-                currentActivity = ActiveActivity(activity: activity)
-                debug(.default, "[LiveActivityManager] Created new activity: \(activity.id)")
+        guard UIApplication.shared.applicationState == .active else {
+            return false
+        }
 
-                // Update the newly created activity with actual data
-                let updateContent = ActivityContent(
-                    state: state,
-                    staleDate: Date.now.addingTimeInterval(5 * 60)
-                )
-                await activity.update(updateContent)
-                debug(.default, "[LiveActivityManager] Set initial content for new activity: \(activity.id)")
-                return true
-            } catch {
-                debug(
-                    .default,
-                    "[LiveActivityManager]: Error creating new activity: \(error)"
-                )
-                // Reset currentActivity on error to allow retry on next update
-                currentActivity = nil
-                return false
-            }
+        do {
+            // Request with real glucose content. Creating an expired placeholder
+            // and immediately replacing it is racy and can leave that placeholder visible.
+            let now = Date.now
+            let content = ActivityContent(
+                state: state,
+                staleDate: LiveActivityUpdatePolicy.staleDate(now: now)
+            )
+            let activity = try Activity.request(
+                attributes: LiveActivityAttributes(startDate: now),
+                content: content,
+                pushType: nil
+            )
+            currentActivity = ActiveActivity(activity: activity)
+            debug(.default, "[LiveActivityManager] Created new activity with current glucose content: \(activity.id)")
+            return true
+        } catch {
+            debug(
+                .default,
+                "[LiveActivityManager]: Error creating new activity: \(error)"
+            )
+            currentActivity = nil
+            return false
         }
     }
 
     /// Ends the current live activity and ensures that all unknown activities are terminated.
     @MainActor private func endActivity() async {
-        debug(.default, "[LiveActivityManager] Ending all live activities...")
+        let activityID = currentActivity?.activity.id
+        let unknownActivities = Activity<LiveActivityAttributes>.activities
+            .filter { $0.id != activityID }
+
+        guard currentActivity != nil || !unknownActivities.isEmpty else {
+            lastPushedContent = nil
+            return
+        }
+
+        debug(.default, "[LiveActivityManager] Ending live activity session.")
 
         if let currentActivity {
-            debug(.default, "[LiveActivityManager] Ending current activity: \(currentActivity.activity.id)")
             await currentActivity.activity.end(nil, dismissalPolicy: .immediate)
             self.currentActivity = nil
         }
         lastPushedContent = nil
 
-        for unknownActivity in Activity<LiveActivityAttributes>.activities {
-            debug(.default, "[LiveActivityManager] Ending unknown activity: \(unknownActivity.id)")
+        for unknownActivity in unknownActivities {
             await unknownActivity.end(nil, dismissalPolicy: .immediate)
         }
-
-        debug(.default, "[LiveActivityManager] All live activities ended.")
     }
 
     /// Restarts the live activity from a Live Activity Intent.
@@ -421,16 +415,22 @@ final class LiveActivityData: ObservableObject {
 
 @available(iOS 16.2, *) extension LiveActivityManager {
     @MainActor func pushCurrentContent(force: Bool = false) async {
+        if !settings.useLiveActivity || !systemEnabled {
+            pendingContent = nil
+            pendingForce = false
+            if currentActivity != nil || !Activity<LiveActivityAttributes>.activities.isEmpty {
+                await endActivity()
+            } else {
+                lastPushedContent = nil
+            }
+            return
+        }
+
         guard let glucose = data.glucoseFromPersistence, let bg = glucose.first else {
             debug(.default, "[LiveActivityManager] pushCurrentContent: no current glucose data available")
             return
         }
         let prevGlucose = data.glucoseFromPersistence?.dropFirst().first
-
-        guard let determination = data.determination else {
-            debug(.default, "[LiveActivityManager] pushCurrentContent: no determination available")
-            return
-        }
 
         let content = LiveActivityAttributes.ContentState(
             new: bg,
@@ -438,19 +438,35 @@ final class LiveActivityData: ObservableObject {
             units: settings.units,
             chart: glucose,
             settings: settings,
-            determination: determination,
+            determination: data.determination,
             iob: data.iob,
             override: data.override,
             tempTarget: data.tempTarget,
             widgetItems: data.widgetItems
         )
 
-        if !force, content == lastPushedContent {
+        pendingContent = content
+        pendingForce = pendingForce || force
+
+        guard !isProcessingUpdate else {
             return
         }
 
-        if await pushUpdate(content) {
-            lastPushedContent = content
+        isProcessingUpdate = true
+        defer { isProcessingUpdate = false }
+
+        while let nextContent = pendingContent {
+            let nextForce = pendingForce
+            pendingContent = nil
+            pendingForce = false
+
+            if !nextForce, nextContent == lastPushedContent {
+                continue
+            }
+
+            if await pushUpdate(nextContent) {
+                lastPushedContent = nextContent
+            }
         }
     }
 }

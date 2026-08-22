@@ -609,12 +609,7 @@ extension Home {
                 .map { [weak self] error in
                     self?.errorDate = error == nil ? nil : Date()
                     if let error = error {
-                        let shouldNotify = (error as? APSError)?.shouldPostNotification ?? true
-                        if shouldNotify {
-                            info(.default, String(describing: error), notificationText: error.localizedDescription)
-                        } else {
-                            info(.default, String(describing: error))
-                        }
+                        debug(.default, "APSManager lastError: \(String(describing: error))")
                     }
                     return error?.localizedDescription
                 }
