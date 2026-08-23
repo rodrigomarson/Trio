@@ -54,27 +54,27 @@ final class SmartAdvertisementScanner: NSObject {
         var errorDescription: String? {
             switch self {
             case .alreadyRunning:
-                return "Já existe uma recuperação de histórico em andamento."
+                return String(localized: "Já existe uma recuperação de histórico em andamento.")
             case .bluetoothUnavailable:
-                return "O Bluetooth não está disponível."
+                return String(localized: "O Bluetooth não está disponível.")
             case .sensorUnavailable:
-                return "O sensor Smart não está disponível para conexão."
+                return String(localized: "O sensor Smart não está disponível para conexão.")
             case .connectionFailed:
-                return "Não foi possível conectar ao sensor Smart."
+                return String(localized: "Não foi possível conectar ao sensor Smart.")
             case .serviceUnavailable:
-                return "O serviço de glicemia do Smart não foi encontrado."
+                return String(localized: "O serviço de glicemia do Smart não foi encontrado.")
             case .characteristicsUnavailable:
-                return "O Smart não expôs os canais necessários para recuperar o histórico."
+                return String(localized: "O Smart não expôs os canais necessários para recuperar o histórico.")
             case .invalidFeature:
-                return "As informações Bluetooth do Smart não puderam ser interpretadas."
+                return String(localized: "As informações Bluetooth do Smart não puderam ser interpretadas.")
             case .invalidMeasurement:
-                return "Uma leitura histórica do Smart não pôde ser validada."
+                return String(localized: "Uma leitura histórica do Smart não pôde ser validada.")
             case let .recordAccessFailed(code):
-                return "O Smart recusou a recuperação do histórico (código \(code))."
+                return String(localized: "O Smart recusou a recuperação do histórico (código \(code)).")
             case .timedOut:
-                return "O Smart não concluiu a recuperação do histórico a tempo."
+                return String(localized: "O Smart não concluiu a recuperação do histórico a tempo.")
             case .cancelled:
-                return "A recuperação do histórico foi cancelada."
+                return String(localized: "A recuperação do histórico foi cancelada.")
             }
         }
     }
@@ -97,34 +97,34 @@ final class SmartAdvertisementScanner: NSObject {
         var errorDescription: String? {
             switch self {
             case .alreadyRunning:
-                return "Já existe uma operação com o Smart em andamento."
+                return String(localized: "Já existe uma operação com o Smart em andamento.")
             case .bluetoothUnavailable:
-                return "O Bluetooth não está disponível."
+                return String(localized: "O Bluetooth não está disponível.")
             case .sensorUnavailable:
-                return "Nenhum novo sensor Smart foi encontrado."
+                return String(localized: "Nenhum novo sensor Smart foi encontrado.")
             case .connectionFailed:
-                return "Não foi possível conectar ao novo sensor Smart."
+                return String(localized: "Não foi possível conectar ao novo sensor Smart.")
             case .serviceUnavailable:
-                return "O serviço de glicemia do novo Smart não foi encontrado."
+                return String(localized: "O serviço de glicemia do novo Smart não foi encontrado.")
             case .characteristicsUnavailable:
-                return "O novo Smart não expôs os canais necessários para a ativação."
+                return String(localized: "O novo Smart não expôs os canais necessários para a ativação.")
             case .invalidFeature:
-                return "As informações Bluetooth do novo Smart não puderam ser validadas."
+                return String(localized: "As informações Bluetooth do novo Smart não puderam ser validadas.")
             case .invalidStatus:
-                return "O estado do novo Smart não pôde ser validado com segurança."
+                return String(localized: "O estado do novo Smart não pôde ser validado com segurança.")
             case .currentSessionIsActive:
-                return "Esse Smart já possui uma sessão ativa. O sensor atual não foi alterado."
+                return String(localized: "Esse Smart já possui uma sessão ativa. O sensor atual não foi alterado.")
             case let .startSessionFailed(code):
                 if let code {
-                    return "O Smart recusou o início da nova sessão (código \(code))."
+                    return String(localized: "O Smart recusou o início da nova sessão (código \(code)).")
                 }
-                return "O Smart não confirmou o início da nova sessão."
+                return String(localized: "O Smart não confirmou o início da nova sessão.")
             case .timeSynchronizationFailed:
-                return "A sessão iniciou, mas o horário do Smart não pôde ser sincronizado."
+                return String(localized: "A sessão iniciou, mas o horário do Smart não pôde ser sincronizado.")
             case .timedOut:
-                return "O Smart não concluiu a ativação dentro do tempo seguro."
+                return String(localized: "O Smart não concluiu a ativação dentro do tempo seguro.")
             case .cancelled:
-                return "A ativação do novo Smart foi cancelada."
+                return String(localized: "A ativação do novo Smart foi cancelada.")
             }
         }
     }
@@ -195,7 +195,10 @@ final class SmartAdvertisementScanner: NSObject {
     private static let cgmSessionStartTime = CBUUID(string: "2AAA")
     private static let cgmSpecificOpsControlPoint = CBUUID(string: "2AAC")
     private static let recordAccessControlPoint = CBUUID(string: "2A52")
-    static let managerRestorationIdentifier = "com.nightscout.Trio.smartCGMScanner.manager"
+    static var managerRestorationIdentifier: String {
+        "\(Bundle.main.bundleIdentifier ?? "com.nightscout.Trio").smartCGMScanner.manager"
+    }
+
     /// Smart normally advertises once per minute. Waiting slightly longer than
     /// that before rebuilding a stale scan avoids unnecessary radio restarts
     /// while still recovering well inside Trio's four-minute delivery cadence.

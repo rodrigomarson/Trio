@@ -172,22 +172,26 @@ enum SmartSensorReminderPolicy {
         var title: String {
             switch self {
             case .expiresIn24Hours:
-                return "O Smart termina em 24 horas"
+                return String(localized: "O Smart termina em 24 horas")
             case .prepareIn120Minutes:
-                return "Prepare-se para a troca do Smart"
+                return String(localized: "Prepare-se para a troca do Smart")
             case .replaceIn65Minutes:
-                return "Hora de iniciar o novo Smart"
+                return String(localized: "Hora de iniciar o novo Smart")
             }
         }
 
         var body: String {
             switch self {
             case .expiresIn24Hours:
-                return "Tenha um novo sensor disponível para fazer a troca sem interromper as glicemias."
+                return String(localized: "Tenha um novo sensor disponível para fazer a troca sem interromper as glicemias.")
             case .prepareIn120Minutes:
-                return "O sensor atual termina em 2 horas. Deixe o novo Smart e o iPhone preparados para a troca."
+                return String(
+                    localized: "O sensor atual termina em 2 horas. Deixe o novo Smart e o iPhone preparados para a troca."
+                )
             case .replaceIn65Minutes:
-                return "Aplique o novo sensor e use Trio > Smart / LinX > Trocar sensor. O Smart atual continuará enviando glicemias durante o aquecimento."
+                return String(
+                    localized: "Aplique o novo sensor e use Trio > Smart / LinX > Trocar sensor. O Smart atual continuará enviando glicemias durante o aquecimento."
+                )
             }
         }
     }
@@ -225,7 +229,7 @@ enum SmartSensorReminderPolicy {
 /// self-terminating: either a read-only history request or a new-sensor activation.
 final class SmartCGMManager: CGMManagerUI {
     static let pluginIdentifier = "SmartCGMManager"
-    static let localizedTitle = "Smart / LinX (Beta)"
+    static let localizedTitle = String(localized: "Smart / LinX (Beta)")
     private static let sensorLifetime: TimeInterval = .hours(15 * 24)
     private static let warmupPeriod: TimeInterval = .hours(1)
     private static let legacyReplacementReminderPrefix = "Trio.Smart.replacement."
@@ -607,14 +611,14 @@ final class SmartCGMManager: CGMManagerUI {
     var cgmStatusHighlight: DeviceStatusHighlight? {
         guard let lastCommunication = lockedState.value.lastCommunicationDate else {
             return SmartStatusHighlight(
-                localizedMessage: "Aguardando\nsensor",
+                localizedMessage: String(localized: "Aguardando\nsensor"),
                 imageName: "dot.radiowaves.left.and.right",
                 state: .normalCGM
             )
         }
         guard Date().timeIntervalSince(lastCommunication) >= .minutes(8) else { return nil }
         return SmartStatusHighlight(
-            localizedMessage: "Sem sinal\nFeche o Smart",
+            localizedMessage: String(localized: "Sem sinal\nFeche o Smart"),
             imageName: "exclamationmark.circle.fill",
             state: .warning
         )
@@ -718,9 +722,10 @@ final class SmartCGMManager: CGMManagerUI {
     private func notifySuccessfulHandover(for peripheralIdentifier: UUID) {
         let identifier = replacementCompletedIdentifier(for: peripheralIdentifier)
         let content = UNMutableNotificationContent()
-        content.title = "Novo Smart ativo"
-        content.body =
-            "O aquecimento terminou, a troca automática foi concluída e a primeira glicemia foi recebida com sucesso."
+        content.title = String(localized: "Novo Smart ativo")
+        content.body = String(
+            localized: "O aquecimento terminou, a troca automática foi concluída e a primeira glicemia foi recebida com sucesso."
+        )
         content.sound = .default
 
         let request = UNNotificationRequest(
@@ -744,9 +749,10 @@ final class SmartCGMManager: CGMManagerUI {
     ) {
         let identifier = handoverVerificationIdentifier(for: peripheralIdentifier)
         let content = UNMutableNotificationContent()
-        content.title = "Confirme a glicemia antes da insulina"
-        content.body =
-            "A troca do Smart mostrou \(Int(referenceGlucose.rounded())) e \(Int(candidateGlucose.rounded())) mg/dL. A insulina automática está protegida. Faça uma ponta de dedo e registre a calibração no Trio."
+        content.title = String(localized: "Confirme a glicemia antes da insulina")
+        content.body = String(
+            localized: "A troca do Smart mostrou \(Int(referenceGlucose.rounded())) e \(Int(candidateGlucose.rounded())) mg/dL. A insulina automática está protegida. Faça uma ponta de dedo e registre a calibração no Trio."
+        )
         content.sound = .default
 
         let request = UNNotificationRequest(
@@ -766,9 +772,10 @@ final class SmartCGMManager: CGMManagerUI {
     private func notifyAutomaticHandoverRelease(for peripheralIdentifier: UUID) {
         let identifier = replacementCompletedIdentifier(for: peripheralIdentifier)
         let content = UNMutableNotificationContent()
-        content.title = "Novo Smart assumido pelo Trio"
-        content.body =
-            "O período de segurança terminou e o novo sensor passou a ser a referência. O algoritmo aguardará três glicemias recentes antes de retomar a insulina automática."
+        content.title = String(localized: "Novo Smart assumido pelo Trio")
+        content.body = String(
+            localized: "O período de segurança terminou e o novo sensor passou a ser a referência. O algoritmo aguardará três glicemias recentes antes de retomar a insulina automática."
+        )
         content.sound = .default
 
         let request = UNNotificationRequest(
@@ -784,9 +791,10 @@ final class SmartCGMManager: CGMManagerUI {
     private func notifyAutomaticInsulinResumed(for peripheralIdentifier: UUID) {
         let identifier = replacementCompletedIdentifier(for: peripheralIdentifier)
         let content = UNMutableNotificationContent()
-        content.title = "Novo Smart validado"
-        content.body =
-            "Três glicemias do novo sensor foram recebidas. A proteção temporária terminou e o tratamento automático pode ser retomado usando o novo Smart como referência."
+        content.title = String(localized: "Novo Smart validado")
+        content.body = String(
+            localized: "Três glicemias do novo sensor foram recebidas. A proteção temporária terminou e o tratamento automático pode ser retomado usando o novo Smart como referência."
+        )
         content.sound = .default
 
         let request = UNNotificationRequest(
@@ -1290,7 +1298,7 @@ final class SmartCGMManager: CGMManagerUI {
     fileprivate func activateReplacementSensor() {
         guard let candidate = lockedState.value.sensorReplacementCandidate else { return }
         lockedState.mutate { state in
-            state.sensorReplacementState = .activating(message: "Conectando ao novo Smart…")
+            state.sensorReplacementState = .activating(message: String(localized: "Conectando ao novo Smart…"))
         }
         notifyLocalStateChanged()
 
@@ -1301,13 +1309,13 @@ final class SmartCGMManager: CGMManagerUI {
                 let message: String
                 switch phase {
                 case .connecting:
-                    message = "Conectando ao novo Smart…"
+                    message = String(localized: "Conectando ao novo Smart…")
                 case .checkingSensor:
-                    message = "Validando o novo sensor…"
+                    message = String(localized: "Validando o novo sensor…")
                 case .startingSession:
-                    message = "Iniciando a nova sessão…"
+                    message = String(localized: "Iniciando a nova sessão…")
                 case .synchronizingTime:
-                    message = "Sincronizando horário e aquecimento…"
+                    message = String(localized: "Sincronizando horário e aquecimento…")
                 }
                 self.lockedState.mutate { state in
                     state.sensorReplacementState = .activating(message: message)
@@ -1394,7 +1402,7 @@ final class SmartCGMManager: CGMManagerUI {
                 let currentMinute = state.lastMinutes
             else {
                 state.lastBackfillError =
-                    "Aguarde uma leitura atual do Smart antes de recuperar o histórico."
+                    String(localized: "Aguarde uma leitura atual do Smart antes de recuperar o histórico.")
                 return
             }
 
@@ -1431,7 +1439,7 @@ final class SmartCGMManager: CGMManagerUI {
                 lockedState.mutate { state in
                     state.isBackfillRunning = false
                     state.lastBackfillError =
-                        "A sessão do sensor mudou durante a recuperação. Nenhuma leitura foi importada."
+                        String(localized: "A sessão do sensor mudou durante a recuperação. Nenhuma leitura foi importada.")
                 }
                 notifyStateChanged()
                 return
@@ -1628,9 +1636,10 @@ final class SmartCGMManager: CGMManagerUI {
         notifyStateChanged()
 
         let content = UNMutableNotificationContent()
-        content.title = "Novo Smart confirmado"
-        content.body =
-            "A ponta de dedo foi registrada. O novo Smart passou a ser a referência; o Trio confirmará três glicemias dele antes de retomar a insulina automática."
+        content.title = String(localized: "Novo Smart confirmado")
+        content.body = String(
+            localized: "A ponta de dedo foi registrada. O novo Smart passou a ser a referência; o Trio confirmará três glicemias dele antes de retomar a insulina automática."
+        )
         content.sound = .default
         let request = UNNotificationRequest(
             identifier: replacementCompletedIdentifier(for: sensorIdentifier),
@@ -1757,22 +1766,22 @@ private final class SmartCGMSetupViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Smart / LinX"
+        title = String(localized: "Smart / LinX")
         view.backgroundColor = .systemBackground
 
-        statusLabel.text = "Procurando um sensor Smart próximo…"
+        statusLabel.text = String(localized: "Procurando um sensor Smart próximo…")
         statusLabel.numberOfLines = 0
         statusLabel.textAlignment = .center
 
-        selectButton.setTitle("Usar este sensor", for: .normal)
+        selectButton.setTitle(String(localized: "Usar este sensor"), for: .normal)
         selectButton.titleLabel?.font = .preferredFont(forTextStyle: .headline)
         selectButton.isEnabled = false
         selectButton.addTarget(self, action: #selector(selectSensor), for: .touchUpInside)
 
         let note = UILabel()
-        note
-            .text =
-            "Mantenha o aplicativo oficial Smart completamente encerrado. O Trio recebe o sensor diretamente por Bluetooth."
+        note.text = String(
+            localized: "Mantenha o aplicativo oficial Smart completamente encerrado. O Trio recebe o sensor diretamente por Bluetooth."
+        )
         note.numberOfLines = 0
         note.textAlignment = .center
         note.textColor = .secondaryLabel
@@ -1799,7 +1808,7 @@ private final class SmartCGMSetupViewController: UIViewController {
     private func sensorDiscovered(_ reading: SmartAdvertisementScanner.Reading) {
         guard discoveredIdentifier == nil else { return }
         discoveredIdentifier = reading.peripheralIdentifier
-        statusLabel.text = "Sensor Smart encontrado. Confirme para vinculá-lo a este Trio."
+        statusLabel.text = String(localized: "Sensor Smart encontrado. Confirme para vinculá-lo a este Trio.")
         selectButton.isEnabled = true
         scanner.stop()
     }
@@ -2190,7 +2199,7 @@ private struct SmartCGMSettingsView: View {
             do {
                 guard try await BaseUnlockManager().unlock() else {
                     presentedAlert = .authenticationError(
-                        "O sensor não foi alterado porque não foi possível confirmar sua identidade."
+                        String(localized: "O sensor não foi alterado porque não foi possível confirmar sua identidade.")
                     )
                     return
                 }
@@ -2204,7 +2213,9 @@ private struct SmartCGMSettingsView: View {
                 }
             } catch {
                 presentedAlert = .authenticationError(
-                    "O sensor permanece conectado. Confirme com Face ID ou com o código do iPhone para continuar."
+                    String(
+                        localized: "O sensor permanece conectado. Confirme com Face ID ou com o código do iPhone para continuar."
+                    )
                 )
             }
         }
@@ -2215,18 +2226,18 @@ private struct SmartCGMSettingsView: View {
             let lastCommunication = snapshot.lastCommunicationDate,
             Date().timeIntervalSince(lastCommunication) < .minutes(10)
         else {
-            return "Sem comunicação"
+            return String(localized: "Sem comunicação")
         }
         if snapshot.expiresAt.map({ $0 <= Date() }) == true {
-            return "Sensor expirado"
+            return String(localized: "Sensor expirado")
         }
         if snapshot.sessionMinutes.map({ $0 < 60 }) == true {
-            return "Aquecendo"
+            return String(localized: "Aquecendo")
         }
         if snapshot.status == 0, snapshot.calibrationTemperatureStatus == 0 {
-            return "Sensor pronto"
+            return String(localized: "Sensor pronto")
         }
-        return "Verificar sensor"
+        return String(localized: "Verificar sensor")
     }
 
     private var isReplacementWarming: Bool {

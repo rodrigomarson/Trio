@@ -85,7 +85,7 @@ extension Calibrations {
                 }
 
                 guard glucose >= 40, glucose <= 400 else {
-                    lastActionMessage = "A glicemia de ponta de dedo deve estar entre 40 e 400 mg/dL."
+                    lastActionMessage = String(localized: "A glicemia de ponta de dedo deve estar entre 40 e 400 mg/dL.")
                     return
                 }
 
@@ -94,18 +94,19 @@ extension Calibrations {
                         let smartManager = fetchGlucoseManager.cgmManager as? SmartCGMManager,
                         let candidate = smartManager.calibrationSnapshot()
                     else {
-                        lastActionMessage = "Aguarde uma nova leitura do Smart antes de calibrar."
+                        lastActionMessage = String(localized: "Aguarde uma nova leitura do Smart antes de calibrar.")
                         return
                     }
 
                     guard Self.isRecent(candidate.date) else {
-                        lastActionMessage = "A leitura do Smart está antiga. Aguarde uma nova leitura."
+                        lastActionMessage = String(localized: "A leitura do Smart está antiga. Aguarde uma nova leitura.")
                         return
                     }
 
                     guard candidate.trendRate.map({ abs($0) < 2 }) ?? false else {
-                        lastActionMessage =
-                            "A glicemia está mudando rapidamente. Aguarde a tendência estabilizar antes de calibrar."
+                        lastActionMessage = String(
+                            localized: "A glicemia está mudando rapidamente. Aguarde a tendência estabilizar antes de calibrar."
+                        )
                         return
                     }
 
@@ -119,9 +120,10 @@ extension Calibrations {
                     let releasedHandoverProtection = smartManager.confirmHandoverAfterFingerstick()
                     newCalibration = 0
                     lastActionMessage = releasedHandoverProtection
-                        ?
-                        "Calibração registrada. O novo Smart foi aceito; a insulina automática será retomada após três glicemias dele."
-                        : "Calibração registrada. As próximas leituras usarão o novo ajuste."
+                        ? String(
+                            localized: "Calibração registrada. O novo Smart foi aceito; a insulina automática será retomada após três glicemias dele."
+                        )
+                        : String(localized: "Calibração registrada. As próximas leituras usarão o novo ajuste.")
                     return
                 }
 
@@ -135,16 +137,16 @@ extension Calibrations {
 
                     calibrationService.addCalibration(calibration)
                     newCalibration = 0
-                    lastActionMessage = "Calibração registrada."
+                    lastActionMessage = String(localized: "Calibração registrada.")
                 } else {
                     debug(.service, "Glucose is stale for calibration")
                     issueStaleGlucoseAlert()
-                    lastActionMessage = "Aguarde uma nova leitura do sensor antes de calibrar."
+                    lastActionMessage = String(localized: "Aguarde uma nova leitura do sensor antes de calibrar.")
                     return
                 }
             } catch {
                 debug(.default, "\(DebuggingIdentifiers.failed) Failed to add calibration: \(error)")
-                lastActionMessage = "Não foi possível registrar a calibração."
+                lastActionMessage = String(localized: "Não foi possível registrar a calibração.")
             }
         }
 
@@ -165,7 +167,7 @@ extension Calibrations {
                 sensorGlucose = nil
                 sensorGlucoseDate = nil
                 sensorTrendRate = nil
-                calibrationReadinessMessage = "Aguardando uma leitura atual do Smart."
+                calibrationReadinessMessage = String(localized: "Aguardando uma leitura atual do Smart.")
                 return
             }
 
@@ -174,10 +176,11 @@ extension Calibrations {
             sensorTrendRate = candidate.trendRate
 
             if !Self.isRecent(candidate.date) {
-                calibrationReadinessMessage = "A leitura do Smart está antiga. Aguarde a próxima leitura."
+                calibrationReadinessMessage = String(localized: "A leitura do Smart está antiga. Aguarde a próxima leitura.")
             } else if candidate.trendRate.map({ abs($0) < 2 }) != true {
-                calibrationReadinessMessage =
-                    "A glicemia ainda não está estável. Aguarde antes de registrar a ponta de dedo."
+                calibrationReadinessMessage = String(
+                    localized: "A glicemia ainda não está estável. Aguarde antes de registrar a ponta de dedo."
+                )
             } else {
                 calibrationReadinessMessage = ""
             }
