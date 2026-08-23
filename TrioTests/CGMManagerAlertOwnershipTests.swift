@@ -52,3 +52,20 @@ import Testing
         #expect(app?.deepLink == nil)
     }
 }
+
+@Suite("Libre sensor regional classification") struct LibreSensorRegionalClassificationTests {
+    @Test("European Libre 2 Plus remains supported") func europeanLibre2Plus() {
+        #expect(SensorType(patchInfo: Data([0xC6, 0x00, 0x00, 0x00, 0x00, 0x00])) == .libre2)
+        #expect(SensorType(patchInfo: Data([0x7F, 0x00, 0x00, 0x00, 0x00, 0x00])) == .libre2)
+    }
+
+    @Test("Brazilian Libre 2 Plus is kept distinct from European Libre 2") func brazilianLibre2Plus() {
+        let brazilPatchInfo = Data([0x2B, 0x0A, 0x3A, 0x08, 0x1F, 0xE1])
+        #expect(SensorType(patchInfo: brazilPatchInfo) == .libre2BR)
+    }
+
+    @Test("Short patch info is safely classified as unknown") func shortPatchInfo() {
+        #expect(SensorType(patchInfo: Data()) == .unknown)
+        #expect(SensorType(patchInfo: Data([0x76])) == .unknown)
+    }
+}

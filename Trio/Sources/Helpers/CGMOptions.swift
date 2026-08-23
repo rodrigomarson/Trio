@@ -5,7 +5,7 @@ let cgmOptions: [CGMOption] = [
     CGMOption(name: "Dexcom G7 / ONE+", predicate: { $0.type == .plugin && $0.displayName.contains("G7") }),
     CGMOption(name: "Dexcom Share", predicate: { $0.type == .plugin && $0.displayName.contains("Dexcom Share") }),
     CGMOption(
-        name: "FreeStyle Libre 1 / 2 / 2+",
+        name: "FreeStyle Libre 1 / 2 / 2+ (regional compatibility)",
         predicate: { $0.type == .plugin && $0.displayName == "FreeStyle Libre 1 / 2 / 2+" }
     ),
     CGMOption(
