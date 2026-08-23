@@ -38,7 +38,7 @@ extension LiveActivityAttributes.ContentState {
     }
 
     static func calculateChange(chart: [GlucoseData], units: GlucoseUnits) -> String {
-        guard chart.count > 2 else { return "" }
+        guard chart.count >= 2 else { return "" }
 
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
@@ -137,17 +137,16 @@ extension LiveActivityAttributes.ContentState {
             bg: formattedBG,
             direction: trendString,
             change: change,
-            // A glucose update is sufficient to keep the activity current while
-            // the matching determination is still being persisted.
-            date: determination?.date ?? bg.date,
+            // Freshness describes the CGM sample shown on the Lock Screen. A
+            // determination can legitimately lag behind a newer BLE reading.
+            date: bg.date,
             highGlucose: settings.high,
             lowGlucose: settings.low,
             target: determination?.target ?? 100 as Decimal,
             glucoseColorScheme: settings.glucoseColorScheme.rawValue,
             useDetailedViewIOS: settings.lockScreenView == .detailed,
             useDetailedViewWatchOS: settings.smartStackView == .detailed,
-            detailedViewState: detailedState,
-            isInitialState: false
+            detailedViewState: detailedState
         )
     }
 }

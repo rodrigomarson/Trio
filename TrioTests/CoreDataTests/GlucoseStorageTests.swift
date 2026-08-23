@@ -1,3 +1,4 @@
+import ActivityKit
 import CoreData
 import Foundation
 import Swinject
@@ -244,6 +245,57 @@ import Testing
         #expect(rendered.count == points.count)
         #expect(rendered.first?.date == points.first?.date)
         #expect(rendered.last?.date == points.last?.date)
+    }
+
+    @Test(
+        "Live Activity keeps updating an old session while Trio is in the background"
+    ) func testLiveActivityOldBackgroundSessionContinuesUpdating() {
+        let now = Date(timeIntervalSince1970: 30000)
+        let action = LiveActivityUpdatePolicy.existingSessionAction(
+            activityState: .active,
+            startDate: now.addingTimeInterval(-(LiveActivityUpdatePolicy.maximumActivityAge + 60)),
+            isAppActive: false,
+            now: now
+        )
+
+        #expect(action == .update)
+    }
+
+    @Test("Live Activity recreates an old session when Trio becomes active") func testLiveActivityOldForegroundSessionRecreates() {
+        let now = Date(timeIntervalSince1970: 30000)
+        let action = LiveActivityUpdatePolicy.existingSessionAction(
+            activityState: .active,
+            startDate: now.addingTimeInterval(-(LiveActivityUpdatePolicy.maximumActivityAge + 60)),
+            isAppActive: true,
+            now: now
+        )
+
+        #expect(action == .recreate)
+    }
+
+    @Test(
+        "Live Activity waits for foreground before replacing an ended session"
+    ) func testLiveActivityEndedBackgroundSessionWaits() {
+        let action = LiveActivityUpdatePolicy.existingSessionAction(
+            activityState: .ended,
+            startDate: Date(timeIntervalSince1970: 1000),
+            isAppActive: false,
+            now: Date(timeIntervalSince1970: 2000)
+        )
+
+        #expect(action == .waitForForeground)
+    }
+
+    @Test("Live Activity calculates glucose change from exactly two readings") func testLiveActivityChangeWithTwoReadings() {
+        let points = [
+            GlucoseData(glucose: 105, date: Date(timeIntervalSince1970: 2000), direction: .flat),
+            GlucoseData(glucose: 100, date: Date(timeIntervalSince1970: 1700), direction: .flat)
+        ]
+
+        let change = LiveActivityAttributes.ContentState.calculateChange(chart: points, units: .mgdL)
+
+        #expect(!change.isEmpty)
+        #expect(change.contains("5"))
     }
 
     @Test(

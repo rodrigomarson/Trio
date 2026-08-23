@@ -27,9 +27,6 @@ struct LiveActivityAttributes: ActivityAttributes {
         let useDetailedViewIOS: Bool
         let useDetailedViewWatchOS: Bool
         let detailedViewState: ContentAdditionalState
-
-        /// true for the first state that is set on the activity
-        let isInitialState: Bool
     }
 
     struct ContentAdditionalState: Codable, Hashable {

@@ -5,6 +5,12 @@ import Foundation
 import Swinject
 import UIKit
 
+@available(iOS 16.2, *) enum LiveActivityExistingSessionAction: Equatable {
+    case update
+    case recreate
+    case waitForForeground
+}
+
 @available(iOS 16.2, *) enum LiveActivityUpdatePolicy {
     static let freshnessWindow: TimeInterval = 12 * 60
     static let maximumActivityAge: TimeInterval = 7 * 60 * 60
@@ -13,34 +19,43 @@ import UIKit
         now.addingTimeInterval(freshnessWindow)
     }
 
-    static func shouldRecreate(activityState: ActivityState, startDate: Date, now: Date = .now) -> Bool {
+    static func existingSessionAction(
+        activityState: ActivityState,
+        startDate: Date,
+        isAppActive: Bool,
+        now: Date = .now
+    ) -> LiveActivityExistingSessionAction {
         switch activityState {
         case .dismissed,
              .ended:
-            return true
+            return isAppActive ? .recreate : .waitForForeground
         case .active,
              .pending,
              .stale:
             break
         @unknown default:
-            return true
+            return isAppActive ? .recreate : .waitForForeground
         }
 
-        return now.timeIntervalSince(startDate) > maximumActivityAge
+        if now.timeIntervalSince(startDate) > maximumActivityAge, isAppActive {
+            return .recreate
+        }
+
+        // ActivityKit can continue accepting updates for an old or stale session.
+        // Keep it alive in the background because requesting a replacement there is
+        // unreliable and otherwise creates a several-hour gap until Trio is opened.
+        return .update
     }
 }
 
 @available(iOS 16.2, *) private struct ActiveActivity {
     let activity: Activity<LiveActivityAttributes>
 
-    /// Determines if the current activity needs to be recreated.
-    ///
-    /// A stale activity remains updateable. Recreating it on every delayed CGM
-    /// reading can leave an expired placeholder on the Lock Screen.
-    func needsRecreation(now: Date = .now) -> Bool {
-        LiveActivityUpdatePolicy.shouldRecreate(
+    func action(isAppActive: Bool, now: Date = .now) -> LiveActivityExistingSessionAction {
+        LiveActivityUpdatePolicy.existingSessionAction(
             activityState: activity.activityState,
             startDate: activity.attributes.startDate,
+            isAppActive: isAppActive,
             now: now
         )
     }
@@ -151,7 +166,10 @@ final class LiveActivityData: ObservableObject {
         notificationCenter
             .addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: nil) { [weak self] _ in
                 Task { @MainActor in
-                    await self?.pushCurrentContent()
+                    // Force a reconciliation with ActivityKit. The system may have
+                    // ended the session while Trio was suspended even when glucose
+                    // content itself did not change.
+                    await self?.pushCurrentContent(force: true)
                 }
             }
         notificationCenter.addObserver(
@@ -168,7 +186,7 @@ final class LiveActivityData: ObservableObject {
     /// - Parameter _: The updated `TrioSettings`.
     func settingsDidChange(_: TrioSettings) {
         Task { @MainActor in
-            await self.pushCurrentContent(force: true)
+            await self.pushCurrentContent()
         }
     }
 
@@ -311,14 +329,16 @@ final class LiveActivityData: ObservableObject {
         }
 
         if let currentActivity {
-            if currentActivity.needsRecreation(), UIApplication.shared.applicationState == .active {
+            let isAppActive = UIApplication.shared.applicationState == .active
+            switch currentActivity.action(isAppActive: isAppActive) {
+            case .recreate:
                 debug(.default, "[LiveActivityManager] Ending current activity for recreation: \(currentActivity.activity.id)")
                 await endActivity()
-            } else if currentActivity.needsRecreation() {
+            case .waitForForeground:
                 // Activity creation is unreliable while Trio is in the background.
-                // didBecomeActive will retry using the newest queued content.
+                // didBecomeActive performs a forced reconciliation.
                 return false
-            } else {
+            case .update:
                 let content = ActivityContent(
                     state: state,
                     staleDate: LiveActivityUpdatePolicy.staleDate()

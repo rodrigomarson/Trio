@@ -149,8 +149,7 @@ private extension LiveActivityAttributes.ContentState {
             glucoseColorScheme: "staticColor",
             useDetailedViewIOS: false,
             useDetailedViewWatchOS: false,
-            detailedViewState: detailedViewState,
-            isInitialState: false
+            detailedViewState: detailedViewState
         )
     }
 
@@ -167,8 +166,7 @@ private extension LiveActivityAttributes.ContentState {
             glucoseColorScheme: "staticColor",
             useDetailedViewIOS: false,
             useDetailedViewWatchOS: false,
-            detailedViewState: detailedViewState,
-            isInitialState: false
+            detailedViewState: detailedViewState
         )
     }
 
@@ -185,8 +183,7 @@ private extension LiveActivityAttributes.ContentState {
             glucoseColorScheme: "staticColor",
             useDetailedViewIOS: false,
             useDetailedViewWatchOS: false,
-            detailedViewState: detailedViewState,
-            isInitialState: false
+            detailedViewState: detailedViewState
         )
     }
 
@@ -204,8 +201,7 @@ private extension LiveActivityAttributes.ContentState {
             glucoseColorScheme: "staticColor",
             useDetailedViewIOS: false,
             useDetailedViewWatchOS: false,
-            detailedViewState: detailedViewState,
-            isInitialState: false
+            detailedViewState: detailedViewState
         )
     }
 
@@ -222,8 +218,7 @@ private extension LiveActivityAttributes.ContentState {
             glucoseColorScheme: "staticColor",
             useDetailedViewIOS: false,
             useDetailedViewWatchOS: false,
-            detailedViewState: detailedViewState,
-            isInitialState: false
+            detailedViewState: detailedViewState
         )
     }
 
@@ -240,8 +235,7 @@ private extension LiveActivityAttributes.ContentState {
             glucoseColorScheme: "staticColor",
             useDetailedViewIOS: false,
             useDetailedViewWatchOS: false,
-            detailedViewState: detailedViewState,
-            isInitialState: false
+            detailedViewState: detailedViewState
         )
     }
 
@@ -259,8 +253,7 @@ private extension LiveActivityAttributes.ContentState {
             glucoseColorScheme: "staticColor",
             useDetailedViewIOS: true,
             useDetailedViewWatchOS: true,
-            detailedViewState: detailedViewState,
-            isInitialState: false
+            detailedViewState: detailedViewState
         )
     }
 
@@ -279,8 +272,7 @@ private extension LiveActivityAttributes.ContentState {
             glucoseColorScheme: "staticColor",
             useDetailedViewIOS: true,
             useDetailedViewWatchOS: true,
-            detailedViewState: detailedViewState,
-            isInitialState: false
+            detailedViewState: detailedViewState
         )
     }
 
@@ -299,8 +291,7 @@ private extension LiveActivityAttributes.ContentState {
             glucoseColorScheme: "staticColor",
             useDetailedViewIOS: true,
             useDetailedViewWatchOS: true,
-            detailedViewState: detailedViewState,
-            isInitialState: false
+            detailedViewState: detailedViewState
         )
     }
 
@@ -320,8 +311,7 @@ private extension LiveActivityAttributes.ContentState {
             glucoseColorScheme: "staticColor",
             useDetailedViewIOS: true,
             useDetailedViewWatchOS: true,
-            detailedViewState: detailedViewState,
-            isInitialState: false
+            detailedViewState: detailedViewState
         )
     }
 
@@ -340,8 +330,7 @@ private extension LiveActivityAttributes.ContentState {
             glucoseColorScheme: "staticColor",
             useDetailedViewIOS: true,
             useDetailedViewWatchOS: true,
-            detailedViewState: detailedViewState,
-            isInitialState: false
+            detailedViewState: detailedViewState
         )
     }
 
@@ -360,8 +349,7 @@ private extension LiveActivityAttributes.ContentState {
             glucoseColorScheme: "staticColor",
             useDetailedViewIOS: true,
             useDetailedViewWatchOS: true,
-            detailedViewState: detailedViewState,
-            isInitialState: false
+            detailedViewState: detailedViewState
         )
     }
 }

@@ -151,23 +151,17 @@ struct LiveActivityView: View {
             }
             .addLiveActivityModifiers(isWatchOS: false)
         } else {
-            Group {
-                if context.state.isInitialState {
-                    Text("Live Activity Expired. Open Trio to Refresh").minimumScaleFactor(0.01)
-                } else {
-                    HStack(spacing: 3) {
-                        LiveActivityBGAndTrendView(context: context, size: .expanded, glucoseColor: glucoseColor).font(.title)
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 5) {
-                            LiveActivityGlucoseDeltaLabelView(
-                                context: context,
-                                glucoseColor: hasStaticColorScheme ? .primary : glucoseColor
-                            ).font(.title3)
-                            LiveActivityUpdatedLabelView(context: context, isDetailedLayout: false)
-                                .font(.caption)
-                                .foregroundStyle(.primary.opacity(0.7))
-                        }
-                    }
+            HStack(spacing: 3) {
+                LiveActivityBGAndTrendView(context: context, size: .expanded, glucoseColor: glucoseColor).font(.title)
+                Spacer()
+                VStack(alignment: .trailing, spacing: 5) {
+                    LiveActivityGlucoseDeltaLabelView(
+                        context: context,
+                        glucoseColor: hasStaticColorScheme ? .primary : glucoseColor
+                    ).font(.title3)
+                    LiveActivityUpdatedLabelView(context: context, isDetailedLayout: false)
+                        .font(.caption)
+                        .foregroundStyle(.primary.opacity(0.7))
                 }
             }
             .addLiveActivityModifiers(isWatchOS: false)
@@ -200,9 +194,7 @@ struct LiveActivityExpandedBottomView: View {
     var context: ActivityViewContext<LiveActivityAttributes>
 
     var body: some View {
-        if context.state.isInitialState {
-            Text("Live Activity Expired. Open Trio to Refresh").minimumScaleFactor(0.01)
-        } else if context.state.useDetailedViewIOS {
+        if context.state.useDetailedViewIOS {
             LiveActivityChartView(context: context, additionalState: context.state.detailedViewState)
                 .addIsWatchOS()
         }
