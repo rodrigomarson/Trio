@@ -186,7 +186,7 @@ final class LiveActivityData: ObservableObject {
     /// - Parameter _: The updated `TrioSettings`.
     func settingsDidChange(_: TrioSettings) {
         Task { @MainActor in
-            await self.pushCurrentContent()
+            await self.pushCurrentContent(force: true)
         }
     }
 
@@ -452,7 +452,7 @@ final class LiveActivityData: ObservableObject {
         }
         let prevGlucose = data.glucoseFromPersistence?.dropFirst().first
 
-        let content = LiveActivityAttributes.ContentState(
+        let rawContent = LiveActivityAttributes.ContentState(
             new: bg,
             prev: prevGlucose,
             units: settings.units,
@@ -464,6 +464,15 @@ final class LiveActivityData: ObservableObject {
             tempTarget: data.tempTarget,
             widgetItems: data.widgetItems
         )
+        let content = LiveActivityPayloadPolicy.contentFittingActivityKitBudget(rawContent)
+
+        let rawSize = LiveActivityPayloadPolicy.encodedSize(of: rawContent)
+        if rawSize != LiveActivityPayloadPolicy.encodedSize(of: content) {
+            debug(
+                .default,
+                "[LiveActivityManager] Compacted content state from \(rawSize) to \(LiveActivityPayloadPolicy.encodedSize(of: content)) bytes"
+            )
+        }
 
         pendingContent = content
         pendingForce = pendingForce || force

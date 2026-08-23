@@ -307,6 +307,10 @@ final class TelemetryClient: Injectable {
             debug(.telemetry, "skip send: App Attest unsupported (simulator or older device)")
             return
         }
+        guard attestor.hasApplicationIdentifier else {
+            debug(.telemetry, "skip send: application identifier unavailable for this distribution")
+            return
+        }
         guard !attestor.isForbidden else {
             debug(.telemetry, "skip send: app_id previously rejected (403)")
             return

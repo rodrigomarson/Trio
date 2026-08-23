@@ -26,11 +26,11 @@ struct LiveActivityAttributes: ActivityAttributes {
         let glucoseColorScheme: String
         let useDetailedViewIOS: Bool
         let useDetailedViewWatchOS: Bool
-        let detailedViewState: ContentAdditionalState
+        var detailedViewState: ContentAdditionalState
     }
 
     struct ContentAdditionalState: Codable, Hashable {
-        let chart: [ChartItem]
+        var chart: [ChartItem]
         let rotationDegrees: Double
         let cob: Decimal
         let iob: Decimal
@@ -46,9 +46,9 @@ struct LiveActivityAttributes: ActivityAttributes {
         let tempTargetDuration: Decimal
         let tempTargetTarget: Decimal
         let widgetItems: [LiveActivityItem]
-        let minForecast: [Int]
-        let maxForecast: [Int]
-        let forecastLines: [ForecastLine]
+        var minForecast: [Int]
+        var maxForecast: [Int]
+        var forecastLines: [ForecastLine]
         let forecastDisplayType: String
     }
 

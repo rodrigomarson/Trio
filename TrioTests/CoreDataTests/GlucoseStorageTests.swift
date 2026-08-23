@@ -247,6 +247,135 @@ import Testing
         #expect(rendered.last?.date == points.last?.date)
     }
 
+    @Test("Live Activity content stays below the ActivityKit payload budget") func testLiveActivityPayloadBudget() {
+        let startDate = Date(timeIntervalSince1970: 50000)
+        var chart = [LiveActivityAttributes.ChartItem]()
+        for index in 0 ..< 120 {
+            let value = Decimal(100 + index % 20)
+            let date = startDate.addingTimeInterval(-TimeInterval(index * 60))
+            chart.append(.init(value: value, date: date))
+        }
+        let forecast = (0 ..< 24).map { 90 + $0 }
+        let content = LiveActivityAttributes.ContentState(
+            unit: "mg/dL",
+            bg: "123",
+            direction: "Flat",
+            change: "+1",
+            date: startDate,
+            highGlucose: 180,
+            lowGlucose: 70,
+            target: 100,
+            glucoseColorScheme: "dynamicColor",
+            useDetailedViewIOS: true,
+            useDetailedViewWatchOS: true,
+            detailedViewState: LiveActivityAttributes.ContentAdditionalState(
+                chart: chart,
+                rotationDegrees: 0,
+                cob: 20,
+                iob: 1.5,
+                tdd: 35,
+                isOverrideActive: true,
+                overrideName: String(repeating: "Override ", count: 12),
+                overrideDate: startDate,
+                overrideDuration: 60,
+                overrideTarget: 90,
+                isTempTargetActive: true,
+                tempTargetName: String(repeating: "Temporary target ", count: 12),
+                tempTargetDate: startDate,
+                tempTargetDuration: 60,
+                tempTargetTarget: 100,
+                widgetItems: LiveActivityAttributes.LiveActivityItem.defaultItems,
+                minForecast: forecast,
+                maxForecast: forecast.map { $0 + 20 },
+                forecastLines: [
+                    .init(type: "iob", values: forecast),
+                    .init(type: "uam", values: forecast.map { $0 + 10 }),
+                    .init(type: "cob", values: forecast.map { $0 + 20 })
+                ],
+                forecastDisplayType: ForecastDisplayType.cone.rawValue
+            )
+        )
+
+        let fitted = LiveActivityPayloadPolicy.contentFittingActivityKitBudget(content)
+        let encodedSize = LiveActivityPayloadPolicy.encodedSize(of: fitted)
+
+        #expect(encodedSize <= LiveActivityPayloadPolicy.maximumEncodedContentStateBytes)
+        #expect(fitted.detailedViewState.chart.first == chart.first)
+        #expect(fitted.detailedViewState.chart.dropFirst().first == chart.dropFirst().first)
+        #expect(fitted.detailedViewState.chart.last == chart.last)
+    }
+
+    @Test("Live Activity does not alter content that already fits") func testLiveActivitySmallPayloadUnchanged() {
+        let startDate = Date(timeIntervalSince1970: 50000)
+        var chart = [LiveActivityAttributes.ChartItem]()
+        for index in 0 ..< 12 {
+            let value = Decimal(100 + index)
+            let date = startDate.addingTimeInterval(-TimeInterval(index * 60))
+            chart.append(.init(value: value, date: date))
+        }
+        let content = LiveActivityAttributes.ContentState(
+            unit: "mg/dL",
+            bg: "100",
+            direction: "Flat",
+            change: "0",
+            date: startDate,
+            highGlucose: 180,
+            lowGlucose: 70,
+            target: 100,
+            glucoseColorScheme: "dynamicColor",
+            useDetailedViewIOS: true,
+            useDetailedViewWatchOS: false,
+            detailedViewState: .init(
+                chart: chart,
+                rotationDegrees: 0,
+                cob: 0,
+                iob: 0,
+                tdd: 0,
+                isOverrideActive: false,
+                overrideName: "",
+                overrideDate: startDate,
+                overrideDuration: 0,
+                overrideTarget: 0,
+                isTempTargetActive: false,
+                tempTargetName: "",
+                tempTargetDate: startDate,
+                tempTargetDuration: 0,
+                tempTargetTarget: 0,
+                widgetItems: LiveActivityAttributes.LiveActivityItem.defaultItems,
+                minForecast: [],
+                maxForecast: [],
+                forecastLines: [],
+                forecastDisplayType: ForecastDisplayType.cone.rawValue
+            )
+        )
+
+        #expect(LiveActivityPayloadPolicy.contentFittingActivityKitBudget(content) == content)
+    }
+
+    @Test("IOB accepts an incomplete lastTemp placeholder") func testIOBIncompleteLastTempDecoding() throws {
+        let json = """
+        [{
+          "iob": 0,
+          "activity": 0,
+          "basaliob": 0,
+          "bolusiob": 0,
+          "netbasalinsulin": 0,
+          "bolusinsulin": 0,
+          "iobWithZeroTemp": null,
+          "lastBolusTime": null,
+          "lastTemp": {"date": 0},
+          "time": null
+        }]
+        """
+
+        let entries = try JSONDecoder().decode([IOBEntry].self, from: Data(json.utf8))
+
+        #expect(entries.count == 1)
+        #expect(entries.first?.lastTemp?.date == 0)
+        #expect(entries.first?.lastTemp?.rate == nil)
+        #expect(entries.first?.lastTemp?.duration == nil)
+    }
+
     @Test(
         "Live Activity keeps updating an old session while Trio is in the background"
     ) func testLiveActivityOldBackgroundSessionContinuesUpdating() {

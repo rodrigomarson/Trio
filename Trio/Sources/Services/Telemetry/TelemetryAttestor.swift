@@ -48,6 +48,13 @@ final class TelemetryAttestor: Injectable {
         service.isSupported
     }
 
+    /// TestFlight/App Store packages may not contain an embedded provisioning
+    /// profile. Detect that before generating an App Attest key or contacting
+    /// the telemetry service so alternate-bundle test apps fail quietly.
+    var hasApplicationIdentifier: Bool {
+        Self.currentAppID() != nil
+    }
+
     /// True once a 403 from `/api/attest/register` has flagged this install
     /// as permanently rejected — typically a misconfigured `app_id`. Callers
     /// should stop attempting to send.
@@ -66,6 +73,7 @@ final class TelemetryAttestor: Injectable {
 
         guard isSupported else { throw AttestError.unsupportedDevice }
         guard !isForbidden else { throw AttestError.forbidden }
+        guard let appID = Self.currentAppID() else { throw AttestError.unknownAppID }
 
         if (keychain.getValue(Bool.self, forKey: Self.registeredStorageKey) ?? false) == true {
             return
@@ -124,10 +132,6 @@ final class TelemetryAttestor: Injectable {
             }
             debug(.telemetry, "attestKey failed: \(error.localizedDescription)")
             throw AttestError.attestationFailed(error)
-        }
-
-        guard let appID = Self.currentAppID() else {
-            throw AttestError.unknownAppID
         }
 
         let body: [String: Any] = [
@@ -277,9 +281,9 @@ final class TelemetryAttestor: Injectable {
     ///
     /// Reads `application-identifier` from `embedded.mobileprovision`. On iOS
     /// the SDK doesn't expose `SecTaskCopyValueForEntitlement` to Swift, and
-    /// parsing the mobile-provision file is the standard workaround. Returns
-    /// nil for App Store builds (no embedded.mobileprovision) — which Trio
-    /// doesn't ship, so this path is fine for sideload + TestFlight.
+    /// parsing the mobile-provision file is the standard workaround.
+    /// TestFlight and App Store packages can omit this file; callers treat nil
+    /// as an unsupported telemetry distribution and skip without retrying.
     static func currentAppID() -> String? {
         guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
               let raw = try? Data(contentsOf: url)
