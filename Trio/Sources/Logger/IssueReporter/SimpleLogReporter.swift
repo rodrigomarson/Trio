@@ -3,6 +3,7 @@ import SwiftDate
 
 final class SimpleLogReporter: IssueReporter {
     private let fileManager = FileManager.default
+    private let writeLock = NSLock()
     private var fileHandle: FileHandle?
     private var activeLogDay: Date?
 
@@ -17,6 +18,8 @@ final class SimpleLogReporter: IssueReporter {
     }
 
     func setup() {
+        writeLock.lock()
+        defer { writeLock.unlock() }
         prepareLogFile(for: Date())
     }
 
@@ -27,6 +30,9 @@ final class SimpleLogReporter: IssueReporter {
     func reportNonFatalIssue(withError _: NSError) {}
 
     func log(_ category: String, _ message: String, file: String, function: String, line: UInt) {
+        writeLock.lock()
+        defer { writeLock.unlock() }
+
         let now = Date()
         prepareLogFile(for: now)
 

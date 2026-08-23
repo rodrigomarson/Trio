@@ -1,5 +1,4 @@
 import Combine
-import CoreData
 import Foundation
 import SwiftDate
 import Swinject
@@ -18,8 +17,6 @@ final class BaseFetchTreatmentsManager: FetchTreatmentsManager, Injectable, Sett
     private lazy var timer = DispatchTimer(timeInterval: 1.minutes.timeInterval, queue: processQueue)
     private var timerSubscriptionReady = false
     private var periodicFetchEnabled: Bool?
-    private var backgroundContext = CoreDataStack.shared.newTaskContext()
-
     init(resolver: Resolver) {
         injectServices(resolver)
         subscribe()

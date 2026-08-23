@@ -721,14 +721,8 @@ final class OpenAPS {
     }
 
     private func loadFileFromStorageAsync(name: String) async -> RawJSON {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let result = Disk.exists(name, in: .documents)
-                    ? self.storage.retrieveRaw(name) ?? OpenAPS.defaults(for: name)
-                    : OpenAPS.defaults(for: name)
-                continuation.resume(returning: result)
-            }
-        }
+        guard Disk.exists(name, in: .documents) else { return OpenAPS.defaults(for: name) }
+        return await storage.retrieveRawAsync(name) ?? OpenAPS.defaults(for: name)
     }
 
     static func defaults(for file: String) -> RawJSON {
