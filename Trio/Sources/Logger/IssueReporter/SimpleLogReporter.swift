@@ -1,10 +1,11 @@
 import Foundation
 import SwiftDate
+import System
 
 final class SimpleLogReporter: IssueReporter {
     private let fileManager = FileManager.default
     private let writeLock = NSLock()
-    private var fileHandle: FileHandle?
+    private var logDescriptor: FileDescriptor?
     private var activeLogDay: Date?
 
     private lazy var dateFormatter: DateFormatter = {
@@ -14,7 +15,7 @@ final class SimpleLogReporter: IssueReporter {
     }()
 
     deinit {
-        fileHandle?.closeFile()
+        try? logDescriptor?.close()
     }
 
     func setup() {
@@ -38,21 +39,24 @@ final class SimpleLogReporter: IssueReporter {
 
         let logEntry = "\(dateFormatter.string(from: now)) [\(category)] \(file.file) - \(function) - \(line) - \(message)\n"
         guard let data = logEntry.data(using: .utf8) else { return }
-        fileHandle?.write(data)
+        if let logDescriptor {
+            try? logDescriptor.writeAll(data)
+        }
     }
 
-    /// Opens the current log once and keeps the handle available for subsequent
+    /// Opens the current log once and keeps an append-only descriptor available for subsequent
     /// writes. The previous implementation reopened the file and queried its
     /// attributes for every diagnostic line, which was costly during background
-    /// operation.
+    /// operation. O_APPEND preserves the official dev fix that prevents concurrent
+    /// writers from overwriting each other's data.
     private func prepareLogFile(for date: Date) {
         let startOfDay = Calendar.current.startOfDay(for: date)
-        if activeLogDay == startOfDay, fileHandle != nil {
+        if activeLogDay == startOfDay, logDescriptor != nil {
             return
         }
 
-        fileHandle?.closeFile()
-        fileHandle = nil
+        try? logDescriptor?.close()
+        logDescriptor = nil
 
         if !fileManager.fileExists(atPath: SimpleLogReporter.logDir) {
             try? fileManager.createDirectory(
@@ -75,8 +79,12 @@ final class SimpleLogReporter: IssueReporter {
             createFile(at: startOfDay)
         }
 
-        fileHandle = FileHandle(forWritingAtPath: SimpleLogReporter.logFile)
-        fileHandle?.seekToEndOfFile()
+        logDescriptor = try? FileDescriptor.open(
+            FilePath(SimpleLogReporter.logFile),
+            .writeOnly,
+            options: [.append, .create],
+            permissions: [.ownerReadWrite, .groupRead, .otherRead]
+        )
         activeLogDay = startOfDay
     }
 
@@ -145,15 +153,13 @@ extension SimpleLogReporter {
 
 private extension Data {
     func append(fileURL: URL) throws {
-        if let fileHandle = FileHandle(forWritingAtPath: fileURL.path) {
-            defer {
-                fileHandle.closeFile()
-            }
-            fileHandle.seekToEndOfFile()
-            fileHandle.write(self)
-        } else {
-            try write(to: fileURL, options: .atomic)
-        }
+        let descriptor = try FileDescriptor.open(
+            FilePath(fileURL.path),
+            .writeOnly,
+            options: [.append, .create],
+            permissions: [.ownerReadWrite, .groupRead, .otherRead]
+        )
+        try descriptor.closeAfter { _ = try descriptor.writeAll(self) }
     }
 }
 
