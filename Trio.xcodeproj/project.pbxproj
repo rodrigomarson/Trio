@@ -1130,6 +1130,11 @@
 		CA0924000000000000000004 /* GRIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA0924000000000000000003 /* GRIView.swift */; };
 		CA0924000000000000000006 /* GRICalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA0924000000000000000005 /* GRICalculatorTests.swift */; };
 		FF42480CF46A31D00C817D8C /* WatchLogEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D79872B74ADDBDD11682D0 /* WatchLogEntry.swift */; };
+		D59C1F1AB461D1BFE9D8EAEF /* SmartCGMKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 4BAF5AA4E01376CEE3D935E9 /* SmartCGMKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		A38FCD9410F3F452F80110E8 /* SmartCGMKitUI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 16B891A5697C4982C81B560A /* SmartCGMKitUI.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		757149C43C0DE3E92E5E93E1 /* SmartCGMKitUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 16B891A5697C4982C81B560A /* SmartCGMKitUI.framework */; };
+		94A3FCFB6110840A3094410A /* SmartCGMKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4BAF5AA4E01376CEE3D935E9 /* SmartCGMKit.framework */; };
+		A58500000000000000000002 /* SmartHostIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A58500000000000000000001 /* SmartHostIntegrationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1207,6 +1212,8 @@
 				B6E925142EB3932A0076D719 /* OmnipodKit.framework in Embed Frameworks */,
 				3E5308A63002BC970075629E /* AccuChekKit.framework in Embed Frameworks */,
 				CE95BF5E2BA770C300DC3DE3 /* LoopKitUI.framework in Embed Frameworks */,
+				D59C1F1AB461D1BFE9D8EAEF /* SmartCGMKit.framework in Embed Frameworks */,
+				A38FCD9410F3F452F80110E8 /* SmartCGMKitUI.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2348,6 +2355,9 @@
 		CA0924000000000000000001 /* GRICalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GRICalculator.swift; sourceTree = "<group>"; };
 		CA0924000000000000000003 /* GRIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GRIView.swift; sourceTree = "<group>"; };
 		CA0924000000000000000005 /* GRICalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GRICalculatorTests.swift; sourceTree = "<group>"; };
+		4BAF5AA4E01376CEE3D935E9 /* SmartCGMKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = SmartCGMKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		16B891A5697C4982C81B560A /* SmartCGMKitUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = SmartCGMKitUI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		A58500000000000000000001 /* SmartHostIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrioTests/SmartHostIntegrationTests.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -2404,6 +2414,8 @@
 				E0CC2C5C275B9F0F00A7BC71 /* HealthKit.framework in Frameworks */,
 				CE95BF5D2BA770C300DC3DE3 /* LoopKitUI.framework in Frameworks */,
 				3E28F2AB2EB5337F00FB9EEB /* ConnectIQ in Frameworks */,
+				94A3FCFB6110840A3094410A /* SmartCGMKit.framework in Frameworks */,
+				757149C43C0DE3E92E5E93E1 /* SmartCGMKitUI.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3150,6 +3162,8 @@
 				6B1A8D012B14D88B00E76752 /* UniformTypeIdentifiers.framework */,
 				6B1A8D182B14D91600E76752 /* WidgetKit.framework */,
 				6B1A8D1A2B14D91600E76752 /* SwiftUI.framework */,
+				4BAF5AA4E01376CEE3D935E9 /* SmartCGMKit.framework */,
+				16B891A5697C4982C81B560A /* SmartCGMKitUI.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -3252,6 +3266,7 @@
 		388E595925AD948C0019842D /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				A58500000000000000000001 /* SmartHostIntegrationTests.swift */,
 				388E595825AD948C0019842D /* Trio.app */,
 				38FCF3ED25E9028E0078B0D1 /* TrioTests.xctest */,
 				6B1A8D172B14D91600E76752 /* LiveActivityExtension.appex */,
@@ -6501,6 +6516,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A58500000000000000000002 /* SmartHostIntegrationTests.swift in Sources */,
 				3B5CD2C92D4AECD500CE213C /* ProfileCarbsTests.swift in Sources */,
 				3BEDC9932EEB27B600AC6492 /* IobConsecutiveEventsTests.swift in Sources */,
 				3B1DB90F2E63C14C00BD814B /* DetermineBasalLowEventualGlucoseTests.swift in Sources */,

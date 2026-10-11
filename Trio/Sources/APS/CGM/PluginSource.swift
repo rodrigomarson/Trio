@@ -8,6 +8,8 @@ import LibreLoop
 import LibreTransmitter
 import LoopKit
 import LoopKitUI
+import SmartCGMKit
+import SmartCGMKitUI
 import SyaiKit
 
 final class PluginSource: GlucoseSource {
@@ -311,6 +313,11 @@ extension PluginSource: CGMManagerDelegate {
                 sensorActivatedAt = cgmTransmitterManager.state.activatedAt
                 sensorStartDate = cgmTransmitterManager.state.activatedAt
                 sensorTransmitterID = cgmTransmitterManager.state.mac
+            } else if let smartManager = cgmManager as? SmartCGMManager {
+                let metadata = smartManager.sensorMetadata()
+                sensorActivatedAt = metadata.sessionStartDate
+                sensorStartDate = metadata.sessionStartDate
+                sensorTransmitterID = metadata.sensorIdentifier
             }
 
             // isDisplayOnly means "shifted for visual consistency after calibration"

@@ -1,3 +1,4 @@
+import ActivityKit
 import CoreData
 import Foundation
 import Swinject
@@ -149,6 +150,37 @@ import Testing
         #expect(manualEntry?.type == "mbg", "Manual entry type should remain unchanged")
     }
 
+    @Test("Sensor and manual glucose keep distinct identities through storage and Nightscout export")
+    func testSensorAndManualGlucoseRoundTrip() async throws {
+        let sensorDate = Date().addingTimeInterval(-300)
+        let manualDate = sensorDate.addingTimeInterval(60)
+        try await storage.storeGlucose([
+            BloodGlucose(id: UUID().uuidString, sgv: 160, date: 123, dateString: sensorDate, glucose: 160, type: "sgv"),
+            BloodGlucose(id: UUID().uuidString, mbg: 161, date: 456, dateString: manualDate, glucose: 161, type: "mbg")
+        ])
+
+        let rows = try await coreDataStack.fetchEntitiesAsync(
+            ofType: GlucoseStored.self,
+            onContext: testContext,
+            predicate: NSPredicate(format: "glucose IN %@", [160, 161]),
+            key: "date",
+            ascending: true
+        ) as? [GlucoseStored]
+        #expect(rows?.count == 2)
+        #expect(rows?.first { $0.glucose == 160 }?.isManual == false)
+        #expect(rows?.first { $0.glucose == 161 }?.isManual == true)
+
+        let entries = try await storage.getGlucoseNotYetUploadedToNightscout()
+        let sensor = entries.first { $0.sgv == 160 }
+        let manual = entries.first { $0.mbg == 161 }
+        #expect(sensor?.mbg == nil)
+        #expect(sensor?.type == "sgv")
+        #expect(sensor?.dateString == sensorDate)
+        #expect(manual?.sgv == nil)
+        #expect(manual?.type == "mbg")
+        #expect(manual?.dateString == manualDate)
+    }
+
     @Test("Sub-39 glucose is clamped to 39 on storeGlucose") func testStoreGlucoseClampsBelowMinimum() async throws {
         // Given a CGM reading below the 39 mg/dL floor (e.g. LibreTransmitter delivering 23)
         let testGlucose = [
@@ -200,6 +232,252 @@ import Testing
         ) as? [GlucoseStored]
 
         #expect(clampedEntries?.count == 1, "Sub-39 backfilled glucose should be clamped and stored as 39")
+    }
+
+    @Test("CGM state upload ledger excludes completed treatments") func testCGMStateUploadLedgerPending() {
+        let first = makeSensorChange(date: Date(timeIntervalSince1970: 1000), notes: "first")
+        let second = makeSensorChange(date: Date(timeIntervalSince1970: 2000), notes: "second")
+
+        let pending = CGMStateUploadLedger.pending(
+            all: [second, first],
+            uploaded: [first]
+        )
+
+        #expect(pending == [second])
+    }
+
+    @Test("CGM state upload ledger merges, deduplicates, and prunes") func testCGMStateUploadLedgerMerge() {
+        let now = Date(timeIntervalSince1970: 4_000_000)
+        let expired = makeSensorChange(
+            date: now.addingTimeInterval(-31.days.timeInterval),
+            notes: "expired"
+        )
+        let current = makeSensorChange(
+            date: now.addingTimeInterval(-1.days.timeInterval),
+            notes: "current"
+        )
+
+        let merged = CGMStateUploadLedger.merging(
+            existing: [expired, current],
+            successfullyUploaded: [current],
+            now: now
+        )
+
+        #expect(merged == [current])
+    }
+
+    @Test("Live Activity keeps the complete six-hour chart window") func testLiveActivityChartCoverage() {
+        let newestDate = Date(timeIntervalSince1970: 10000)
+        let points = (0 ..< 360).map { minute in
+            GlucoseData(
+                glucose: 100 + minute % 10,
+                date: newestDate.addingTimeInterval(TimeInterval(-minute * 60)),
+                direction: .flat
+            )
+        }
+
+        let rendered = LiveActivityGlucoseChartPolicy.pointsForRendering(points)
+
+        #expect(rendered.count == LiveActivityGlucoseChartPolicy.maximumRenderedPointCount)
+        #expect(rendered[0].date == points[0].date)
+        #expect(rendered[1].date == points[1].date)
+        #expect(rendered.last?.date == points.last?.date)
+    }
+
+    @Test("Live Activity preserves every Smart point when no reduction is needed") func testLiveActivityKeepsSmartPoints() {
+        let points = (0 ..< 90).map { minute in
+            GlucoseData(
+                glucose: 100,
+                date: Date(timeIntervalSince1970: TimeInterval(minute * 4 * 60)),
+                direction: .flat
+            )
+        }
+
+        let rendered = LiveActivityGlucoseChartPolicy.pointsForRendering(points)
+
+        #expect(rendered.count == points.count)
+        #expect(rendered.first?.date == points.first?.date)
+        #expect(rendered.last?.date == points.last?.date)
+    }
+
+    @Test("Live Activity content stays below the ActivityKit payload budget") func testLiveActivityPayloadBudget() {
+        let startDate = Date(timeIntervalSince1970: 50000)
+        var chart = [LiveActivityAttributes.ChartItem]()
+        for index in 0 ..< 120 {
+            let value = Decimal(100 + index % 20)
+            let date = startDate.addingTimeInterval(-TimeInterval(index * 60))
+            chart.append(.init(value: value, date: date))
+        }
+        let forecast = (0 ..< 24).map { 90 + $0 }
+        let content = LiveActivityAttributes.ContentState(
+            unit: "mg/dL",
+            bg: "123",
+            direction: "Flat",
+            change: "+1",
+            date: startDate,
+            highGlucose: 180,
+            lowGlucose: 70,
+            target: 100,
+            glucoseColorScheme: "dynamicColor",
+            useDetailedViewIOS: true,
+            useDetailedViewWatchOS: true,
+            detailedViewState: LiveActivityAttributes.ContentAdditionalState(
+                chart: chart,
+                rotationDegrees: 0,
+                cob: 20,
+                iob: 1.5,
+                tdd: 35,
+                isOverrideActive: true,
+                overrideName: String(repeating: "Override ", count: 12),
+                overrideDate: startDate,
+                overrideDuration: 60,
+                overrideTarget: 90,
+                isTempTargetActive: true,
+                tempTargetName: String(repeating: "Temporary target ", count: 12),
+                tempTargetDate: startDate,
+                tempTargetDuration: 60,
+                tempTargetTarget: 100,
+                widgetItems: LiveActivityAttributes.LiveActivityItem.defaultItems,
+                minForecast: forecast,
+                maxForecast: forecast.map { $0 + 20 },
+                forecastLines: [
+                    .init(type: "iob", values: forecast),
+                    .init(type: "uam", values: forecast.map { $0 + 10 }),
+                    .init(type: "cob", values: forecast.map { $0 + 20 })
+                ],
+                forecastDisplayType: ForecastDisplayType.cone.rawValue
+            )
+        )
+
+        let fitted = LiveActivityPayloadPolicy.contentFittingActivityKitBudget(content)
+        let encodedSize = LiveActivityPayloadPolicy.encodedSize(of: fitted)
+
+        #expect(encodedSize <= LiveActivityPayloadPolicy.maximumEncodedContentStateBytes)
+        #expect(fitted.detailedViewState.chart.first == chart.first)
+        #expect(fitted.detailedViewState.chart.dropFirst().first == chart.dropFirst().first)
+        #expect(fitted.detailedViewState.chart.last == chart.last)
+    }
+
+    @Test("Live Activity does not alter content that already fits") func testLiveActivitySmallPayloadUnchanged() {
+        let startDate = Date(timeIntervalSince1970: 50000)
+        var chart = [LiveActivityAttributes.ChartItem]()
+        for index in 0 ..< 12 {
+            let value = Decimal(100 + index)
+            let date = startDate.addingTimeInterval(-TimeInterval(index * 60))
+            chart.append(.init(value: value, date: date))
+        }
+        let content = LiveActivityAttributes.ContentState(
+            unit: "mg/dL",
+            bg: "100",
+            direction: "Flat",
+            change: "0",
+            date: startDate,
+            highGlucose: 180,
+            lowGlucose: 70,
+            target: 100,
+            glucoseColorScheme: "dynamicColor",
+            useDetailedViewIOS: true,
+            useDetailedViewWatchOS: false,
+            detailedViewState: .init(
+                chart: chart,
+                rotationDegrees: 0,
+                cob: 0,
+                iob: 0,
+                tdd: 0,
+                isOverrideActive: false,
+                overrideName: "",
+                overrideDate: startDate,
+                overrideDuration: 0,
+                overrideTarget: 0,
+                isTempTargetActive: false,
+                tempTargetName: "",
+                tempTargetDate: startDate,
+                tempTargetDuration: 0,
+                tempTargetTarget: 0,
+                widgetItems: LiveActivityAttributes.LiveActivityItem.defaultItems,
+                minForecast: [],
+                maxForecast: [],
+                forecastLines: [],
+                forecastDisplayType: ForecastDisplayType.cone.rawValue
+            )
+        )
+
+        #expect(LiveActivityPayloadPolicy.contentFittingActivityKitBudget(content) == content)
+    }
+
+    @Test("IOB accepts an incomplete lastTemp placeholder") func testIOBIncompleteLastTempDecoding() throws {
+        let json = """
+        [{
+          "iob": 0,
+          "activity": 0,
+          "basaliob": 0,
+          "bolusiob": 0,
+          "netbasalinsulin": 0,
+          "bolusinsulin": 0,
+          "iobWithZeroTemp": null,
+          "lastBolusTime": null,
+          "lastTemp": {"date": 0},
+          "time": null
+        }]
+        """
+
+        let entries = try JSONDecoder().decode([IOBEntry].self, from: Data(json.utf8))
+
+        #expect(entries.count == 1)
+        #expect(entries.first?.lastTemp?.date == 0)
+        #expect(entries.first?.lastTemp?.rate == nil)
+        #expect(entries.first?.lastTemp?.duration == nil)
+    }
+
+    @Test(
+        "Live Activity keeps updating an old session while Trio is in the background"
+    ) func testLiveActivityOldBackgroundSessionContinuesUpdating() {
+        let now = Date(timeIntervalSince1970: 30000)
+        let action = LiveActivityUpdatePolicy.existingSessionAction(
+            activityState: .active,
+            startDate: now.addingTimeInterval(-(LiveActivityUpdatePolicy.maximumActivityAge + 60)),
+            isAppActive: false,
+            now: now
+        )
+
+        #expect(action == .update)
+    }
+
+    @Test("Live Activity recreates an old session when Trio becomes active") func testLiveActivityOldForegroundSessionRecreates() {
+        let now = Date(timeIntervalSince1970: 30000)
+        let action = LiveActivityUpdatePolicy.existingSessionAction(
+            activityState: .active,
+            startDate: now.addingTimeInterval(-(LiveActivityUpdatePolicy.maximumActivityAge + 60)),
+            isAppActive: true,
+            now: now
+        )
+
+        #expect(action == .recreate)
+    }
+
+    @Test(
+        "Live Activity waits for foreground before replacing an ended session"
+    ) func testLiveActivityEndedBackgroundSessionWaits() {
+        let action = LiveActivityUpdatePolicy.existingSessionAction(
+            activityState: .ended,
+            startDate: Date(timeIntervalSince1970: 1000),
+            isAppActive: false,
+            now: Date(timeIntervalSince1970: 2000)
+        )
+
+        #expect(action == .waitForForeground)
+    }
+
+    @Test("Live Activity calculates glucose change from exactly two readings") func testLiveActivityChangeWithTwoReadings() {
+        let points = [
+            GlucoseData(glucose: 105, date: Date(timeIntervalSince1970: 2000), direction: .flat),
+            GlucoseData(glucose: 100, date: Date(timeIntervalSince1970: 1700), direction: .flat)
+        ]
+
+        let change = LiveActivityAttributes.ContentState.calculateChange(chart: points, units: .mgdL)
+
+        #expect(!change.isEmpty)
+        #expect(change.contains("5"))
     }
 
     @Test(
@@ -301,4 +579,15 @@ import Testing
          // longAvgDelta: only the 30m window: (100–130)/30*5 = –5
          #expect(status!.longAvgDelta == -5)
      }*/
+
+    private func makeSensorChange(date: Date, notes: String) -> NightscoutTreatment {
+        NightscoutTreatment(
+            eventType: .nsSensorChange,
+            createdAt: date,
+            enteredBy: NightscoutTreatment.local,
+            notes: notes,
+            targetTop: nil,
+            targetBottom: nil
+        )
+    }
 }

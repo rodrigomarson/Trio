@@ -6,6 +6,8 @@ import MedtrumKit
 import MinimedKit
 import ObjectiveC
 import OmnipodKit
+import SmartCGMKit
+import SmartCGMKitUI
 import Testing
 @testable import Trio
 import UIKit
@@ -70,6 +72,15 @@ import UIKit
                 #expect(entry.cgmType.rawValue == entry.id, "\(entry.name) id must be its CGMType raw value")
             }
         }
+    }
+
+    @Test("Smart remains a managed CGM in the official device catalog") func testSmartCatalogEntry() {
+        let smart = DeviceCatalog.cgmEntry(id: SmartCGMManager.pluginIdentifier)
+        #expect(smart?.managerType?.pluginIdentifier == SmartCGMManager.pluginIdentifier)
+        #expect(smart?.cgmType == .plugin)
+        #expect(smart?.manufacturer == .smartLinX)
+        #expect(smart?.name == "Smart / LinX (Beta)")
+        #expect(smart?.icon == DeviceIcon.none)
     }
 
     @Test("Every CGMType case is represented in the catalog") func testAllCGMTypesCovered() {
@@ -227,6 +238,7 @@ import UIKit
             "FreeStyle Libre 1 / 2 / 2+",
             "FreeStyle Libre 3 / 3+ (Beta)",
             "Dexcom G5",
+            "Smart / LinX (Beta)",
             "xDrip4iOS"
         ])
     }

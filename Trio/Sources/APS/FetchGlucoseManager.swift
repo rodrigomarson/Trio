@@ -4,6 +4,7 @@ import Foundation
 import HealthKit
 import LoopKit
 import LoopKitUI
+import SmartCGMKit
 import SwiftDate
 import Swinject
 import UIKit
@@ -37,8 +38,23 @@ extension FetchGlucoseManager {
     }
 }
 
+enum CGMCalibrationResetPolicy {
+    static func shouldResetForManagerUpdate(
+        currentManagerIdentifier: ObjectIdentifier?,
+        newManagerIdentifier: ObjectIdentifier
+    ) -> Bool {
+        currentManagerIdentifier != newManagerIdentifier
+    }
+}
+
+enum CGMTimerFetchPolicy {
+    static func shouldFetch(pluginIdentifier: String?, providesBLEHeartbeat: Bool) -> Bool {
+        !(providesBLEHeartbeat && pluginIdentifier == SmartCGMManager.pluginIdentifier)
+    }
+}
+
 final class BaseFetchGlucoseManager: FetchGlucoseManager, Injectable {
-    private let processQueue = DispatchQueue(label: "BaseGlucoseManager.processQueue")
+    private let processQueue = DispatchQueue(label: "BaseGlucoseManager.processQueue", qos: .utility)
 
     @Injected() var broadcaster: Broadcaster!
     @Injected() var glucoseStorage: GlucoseStorage!
@@ -56,7 +72,9 @@ final class BaseFetchGlucoseManager: FetchGlucoseManager, Injectable {
     private let sensorStateLock = NSRecursiveLock()
 
     private var lifetime = Lifetime()
-    private let timer = DispatchTimer(timeInterval: 1.minutes.timeInterval)
+    private lazy var timer = DispatchTimer(timeInterval: 1.minutes.timeInterval, queue: processQueue)
+    private var timerSubscriptionReady = false
+    private var periodicFetchEnabled: Bool?
     var cgmGlucoseSourceType: CGMType = .none
     var cgmGlucosePluginId: String = ""
     var cgmManager: CGMManagerUI? {
@@ -101,6 +119,14 @@ final class BaseFetchGlucoseManager: FetchGlucoseManager, Injectable {
         timer.publisher
             .receive(on: processQueue)
             .flatMap { [self] _ -> AnyPublisher<[BloodGlucose], Never> in
+                let manager = self.cgmManager
+                guard CGMTimerFetchPolicy.shouldFetch(
+                    pluginIdentifier: manager?.pluginIdentifier,
+                    providesBLEHeartbeat: manager?.providesBLEHeartbeat ?? false
+                ) else {
+                    return Empty(completeImmediately: true).eraseToAnyPublisher()
+                }
+
                 if let glucoseSource = self.glucoseSource {
                     return glucoseSource.fetch(self.timer).eraseToAnyPublisher()
                 } else {
@@ -131,10 +157,34 @@ final class BaseFetchGlucoseManager: FetchGlucoseManager, Injectable {
                 .store(in: &self.lifetime)
             }
             .store(in: &lifetime)
-        timer.fire()
-        timer.resume()
+        timerSubscriptionReady = true
+        updatePeriodicFetchTimer(fireImmediately: true)
 
         broadcaster.register(SettingsObserver.self, observer: self)
+    }
+
+    private func updatePeriodicFetchTimer(fireImmediately: Bool) {
+        guard timerSubscriptionReady else { return }
+
+        let manager = cgmManager
+        let shouldFetch = CGMTimerFetchPolicy.shouldFetch(
+            pluginIdentifier: manager?.pluginIdentifier,
+            providesBLEHeartbeat: manager?.providesBLEHeartbeat ?? false
+        )
+
+        processQueue.async { [weak self] in
+            guard let self else { return }
+            guard self.periodicFetchEnabled != shouldFetch else { return }
+            self.periodicFetchEnabled = shouldFetch
+            if shouldFetch {
+                if fireImmediately {
+                    self.timer.fire()
+                }
+                self.timer.resume()
+            } else {
+                self.timer.suspend()
+            }
+        }
     }
 
     /// Store new glucose readings from the CGM manager
@@ -256,8 +306,14 @@ final class BaseFetchGlucoseManager: FetchGlucoseManager, Injectable {
         // if plugin, if not the same pluginID, need to reset the cgmManager
         // if plugin and newManager provides, update cgmManager
         if let manager = newManager {
+            let shouldResetCalibrations = CGMCalibrationResetPolicy.shouldResetForManagerUpdate(
+                currentManagerIdentifier: cgmManager.map(ObjectIdentifier.init),
+                newManagerIdentifier: ObjectIdentifier(manager)
+            )
             cgmManager = manager
-            removeCalibrations()
+            if shouldResetCalibrations {
+                removeCalibrations()
+            }
         } else if self.cgmGlucoseSourceType == .plugin, cgmManager == nil, let rawCGMManager = rawCGMManager {
             cgmManager = cgmManagerFromRawValue(rawCGMManager)
             updateManagerUnits(cgmManager)
@@ -288,6 +344,7 @@ final class BaseFetchGlucoseManager: FetchGlucoseManager, Injectable {
         // Only an active plugin CGM with its own BLE connection can wake the app; otherwise the pump must heartbeat
         let cgmProvidesHeartbeat = cgmGlucoseSourceType == .plugin && (cgmManager?.providesBLEHeartbeat ?? false)
         deviceDataManager.updateCGMHeartbeatCapability(providesBLEHeartbeat: cgmProvidesHeartbeat)
+        updatePeriodicFetchTimer(fireImmediately: true)
     }
 
     /// Upload cgmManager from raw value

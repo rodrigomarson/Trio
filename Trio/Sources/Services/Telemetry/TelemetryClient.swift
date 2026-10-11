@@ -460,6 +460,10 @@ final class TelemetryClient: Injectable {
             debug(.telemetry, "Send skipped: App Attest unsupported on this device")
             return failed("app_attest_unsupported")
         }
+        guard attestor.hasApplicationIdentifier else {
+            debug(.telemetry, "skip send: application identifier unavailable for this distribution")
+            return failed("application_identifier_unavailable")
+        }
         guard !attestor.isForbidden else {
             debug(.telemetry, "Send skipped: registration was rejected with HTTP 403")
             return failed("app_attest_forbidden")

@@ -1,6 +1,92 @@
 import CoreData
 import Foundation
 
+enum LiveActivityGlucoseChartPolicy {
+    /// A six-hour window can contain up to 360 one-minute CGM samples.
+    static let maximumFetchedPointCount = 360
+
+    /// The lock-screen chart cannot visually distinguish hundreds of adjacent
+    /// points. Capping the rendered payload keeps ActivityKit updates efficient
+    /// while retaining the newest values and coverage of the complete window.
+    static let maximumRenderedPointCount = 120
+
+    static func sampled<T>(_ points: [T], maximumCount: Int) -> [T] {
+        guard maximumCount > 0, points.count > maximumCount else { return points }
+        guard maximumCount > 2 else { return Array(points.prefix(maximumCount)) }
+
+        let newest = Array(points.prefix(2))
+        let older = Array(points.dropFirst(2))
+        let availableSlots = maximumCount - newest.count
+        guard availableSlots > 1, older.count > availableSlots else {
+            return Array(points.prefix(maximumCount))
+        }
+
+        let lastIndex = older.count - 1
+        let sampledOlder = (0 ..< availableSlots).map { slot in
+            let ratio = Double(slot) / Double(availableSlots - 1)
+            let index = Int((ratio * Double(lastIndex)).rounded())
+            return older[index]
+        }
+        return newest + sampledOlder
+    }
+
+    static func pointsForRendering(_ points: [GlucoseData]) -> [GlucoseData] {
+        sampled(points, maximumCount: maximumRenderedPointCount)
+    }
+}
+
+enum LiveActivityPayloadPolicy {
+    /// ActivityKit's complete payload must remain below 4,096 bytes. The
+    /// content state deliberately keeps a margin for attributes and system
+    /// framing that are added outside this encoder.
+    static let maximumEncodedContentStateBytes = 3200
+    static let minimumChartPointCount = 12
+
+    static func encodedSize(of content: LiveActivityAttributes.ContentState) -> Int {
+        (try? JSONEncoder().encode(content).count) ?? .max
+    }
+
+    static func contentFittingActivityKitBudget(
+        _ content: LiveActivityAttributes.ContentState
+    ) -> LiveActivityAttributes.ContentState {
+        guard encodedSize(of: content) > maximumEncodedContentStateBytes else { return content }
+
+        var candidate = content
+        var chartCount = candidate.detailedViewState.chart.count
+
+        while encodedSize(of: candidate) > maximumEncodedContentStateBytes,
+              chartCount > minimumChartPointCount
+        {
+            chartCount = max(minimumChartPointCount, Int((Double(chartCount) * 0.8).rounded(.down)))
+            candidate.detailedViewState.chart = LiveActivityGlucoseChartPolicy.sampled(
+                content.detailedViewState.chart,
+                maximumCount: chartCount
+            )
+        }
+
+        guard encodedSize(of: candidate) > maximumEncodedContentStateBytes else { return candidate }
+
+        // Forecasts are useful, but the current glucose and chart take
+        // priority. If unusually large scalar/string content remains, shed
+        // prediction arrays before reducing the chart to its final fallback.
+        candidate.detailedViewState.minForecast = []
+        candidate.detailedViewState.maxForecast = []
+        candidate.detailedViewState.forecastLines = []
+
+        while encodedSize(of: candidate) > maximumEncodedContentStateBytes,
+              candidate.detailedViewState.chart.count > 2
+        {
+            let nextCount = max(2, candidate.detailedViewState.chart.count - 2)
+            candidate.detailedViewState.chart = LiveActivityGlucoseChartPolicy.sampled(
+                content.detailedViewState.chart,
+                maximumCount: nextCount
+            )
+        }
+
+        return candidate
+    }
+}
+
 // Fetch Data for Glucose and Determination from Core Data and map them to the Structs in order to pass them thread safe to the glucoseDidUpdate/ pushUpdate function
 
 @available(iOS 16.2, *)
@@ -13,7 +99,8 @@ extension LiveActivityManager {
             onContext: context,
             predicate: NSPredicate.predicateForSixHoursAgo,
             key: "date",
-            ascending: false
+            ascending: false,
+            fetchLimit: LiveActivityGlucoseChartPolicy.maximumFetchedPointCount
         )
 
         return try await context.perform {
@@ -21,9 +108,10 @@ extension LiveActivityManager {
                 throw CoreDataError.fetchError(function: #function, file: #file)
             }
 
-            return glucoseResults.map {
+            let points = glucoseResults.map {
                 GlucoseData(glucose: Int($0.glucose), date: $0.date ?? Date(), direction: $0.directionEnum)
             }
+            return LiveActivityGlucoseChartPolicy.pointsForRendering(points)
         }
     }
 

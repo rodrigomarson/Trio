@@ -1,4 +1,5 @@
 import Foundation
+import SmartCGMKit
 
 enum CGMType: String, JSON, CaseIterable, Identifiable {
     var id: String { rawValue }
@@ -69,3 +70,6 @@ enum GlucoseDataError: Error {
     case noData
     case unreliableData
 }
+
+// Retain the existing host enforcement while the manager owns its state.
+typealias CGMAutomaticInsulinSafetyInterlock = SmartAutomaticInsulinSafetyInterlock
