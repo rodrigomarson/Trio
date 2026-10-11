@@ -241,7 +241,7 @@ extension PluginSource: CGMManagerDelegate {
         UUID().uuidString
     }
 
-    func cgmManager(_: CGMManager, didUpdate status: CGMManagerStatus) {
+    func cgmManager(_ manager: CGMManager, didUpdate status: CGMManagerStatus) {
         debug(.cgm, "CGM status: valid sensor session \(status.hasValidSensorSession)")
         processQueue.async { [weak self] in
             guard let self = self else { return }
@@ -252,6 +252,16 @@ extension PluginSource: CGMManagerDelegate {
                 info(.cgm, status.hasValidSensorSession ? "Sensor session started" : "Sensor session ended")
                 self.cgmHasValidSensorSession = status.hasValidSensorSession
             }
+            if let smartManager = manager as? SmartCGMManager {
+                self.glucoseManager?.reportCGMSensorObservation(
+                    smartManager.sensorObservation.cgmSensorObservation
+                )
+            }
+            if let smartManager = manager as? SmartCGMManager {
+                self.glucoseManager?.reportCGMSensorObservation(
+                    smartManager.sensorObservation.cgmSensorObservation
+                )
+            }
         }
     }
 
@@ -261,6 +271,8 @@ extension PluginSource: CGMManagerDelegate {
             return cgmTransmitterManager.latestReading?.algorithmState.observation ?? .unavailable
         } else if let cgmTransmitterManager = cgmManager as? G6CGMManager {
             return cgmTransmitterManager.latestReading?.state.observation ?? .unavailable
+        } else if let smartManager = cgmManager as? SmartCGMManager {
+            return smartManager.sensorObservation.cgmSensorObservation
         }
         return .unavailable
     }

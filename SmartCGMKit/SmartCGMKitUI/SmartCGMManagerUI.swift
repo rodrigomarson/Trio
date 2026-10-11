@@ -396,7 +396,7 @@ private struct SmartCGMSettingsView: View {
                     )
                 }
 
-                if let warmupEndsAt = activeWarmupEndsAt {
+                if let warmupEndsAt = displayedWarmupEndsAt {
                     Divider()
                     TimelineView(.periodic(from: Date(), by: 30)) { context in
                         HStack {
@@ -430,7 +430,15 @@ private struct SmartCGMSettingsView: View {
 
     private var expirationArea: some View {
         VStack(alignment: .leading, spacing: 5) {
-            if isSessionStopped {
+            if isReplacementWarming {
+                Text("New Smart Warming Up")
+                    .font(.headline)
+                    .foregroundColor(.orange)
+                Text("Trio will switch after the new sensor provides reliable readings.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if isSessionStopped {
                 Text("Session Not Started")
                     .font(.headline)
                     .foregroundColor(.orange)
@@ -564,7 +572,7 @@ private struct SmartCGMSettingsView: View {
     }
 
     @ViewBuilder private var activationSection: some View {
-        if isSessionStopped {
+        if isSessionStopped, !isReplacementWarming {
             Section(
                 footer: Text(
                     "Trio will check the sensor state, start only a stopped session, and confirm the start before showing warmup."
@@ -721,6 +729,9 @@ private struct SmartCGMSettingsView: View {
     }
 
     private var sensorState: String {
+        if isReplacementWarming {
+            return String(localized: "New Smart Warming Up")
+        }
         if isSessionStopped {
             return String(localized: "Activation Not Confirmed")
         }
@@ -749,7 +760,12 @@ private struct SmartCGMSettingsView: View {
         SmartSessionStatusPolicy.isStopped(status: snapshot.status)
     }
 
-    private var activeWarmupEndsAt: Date? {
+    private var displayedWarmupEndsAt: Date? {
+        if case let .warming(_, readyAt, _) = snapshot.sensorReplacementState,
+           readyAt > Date()
+        {
+            return readyAt
+        }
         guard SmartSessionStatusPolicy.isWarmupConfirmed(
             status: snapshot.status,
             minutesSinceStart: snapshot.sessionMinutes

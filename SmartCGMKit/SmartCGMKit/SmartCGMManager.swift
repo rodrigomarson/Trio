@@ -44,6 +44,31 @@ public enum SmartSessionStatusPolicy {
     }
 }
 
+/// A host-neutral summary of whether Smart can currently supply glucose.
+///
+/// Trio maps the unavailable states into its generic CGM sensor-state log.
+/// Keeping this type inside SmartCGMKit avoids coupling the kit to Trio's
+/// persistence or Nightscout implementation.
+public enum SmartSensorObservation: Equatable {
+    public enum UnreliableState: String, Equatable {
+        case notActivated = "smartNotActivated"
+        case waitingForSensor = "smartWaitingForSensor"
+        case warmup = "smartWarmup"
+        case noSignal = "smartNoSignal"
+        case expired = "smartExpired"
+        case checkSensor = "smartCheckSensor"
+        case replacementWarmup = "smartReplacementWarmup"
+        case replacementNoSignal = "smartReplacementNoSignal"
+        case replacementConfirming = "smartReplacementConfirming"
+        case handoverVerification = "smartHandoverVerification"
+        case handoverReacquisition = "smartHandoverReacquisition"
+    }
+
+    case reliable
+    case unreliable(UnreliableState)
+    case unavailable
+}
+
 /// Decides when a newly activated Smart can safely replace the sensor that is
 /// still supplying Trio. The pending sensor is observed but never forwarded to
 /// the glucose pipeline until it has completed the nominal warmup and produced
@@ -609,11 +634,78 @@ public final class SmartCGMManager: CGMManager {
 
     public var cgmManagerStatus: CGMManagerStatus {
         let state = lockedState.value
+        let hasActiveSession = state.sensorSessionAnchor != nil &&
+            !SmartSessionStatusPolicy.isStopped(status: state.lastStatus)
+        let hasPendingSession = state.pendingSessionAnchor != nil &&
+            state.pendingPeripheralIdentifier != nil
+        let communicationDates = [state.lastCommunicationDate, state.pendingLastCommunicationDate]
+            .compactMap { $0 }
         return CGMManagerStatus(
-            hasValidSensorSession: true,
-            lastCommunicationDate: state.lastCommunicationDate,
+            hasValidSensorSession: hasActiveSession || hasPendingSession,
+            lastCommunicationDate: communicationDates.max(),
             device: Self.device
         )
+    }
+
+    public var sensorObservation: SmartSensorObservation {
+        sensorObservation(now: Date())
+    }
+
+    func sensorObservation(now: Date) -> SmartSensorObservation {
+        let state = lockedState.value
+        let activeReadingIsReliable = state.lastStatus == 0 &&
+            state.lastCalibrationTemperatureStatus == 0 &&
+            state.lastCommunicationDate.map { now.timeIntervalSince($0) < .minutes(8) } == true &&
+            state.currentGlucose.map { $0.isFinite && (20 ... 600).contains($0) } == true &&
+            state.currentGlucoseDate.map { now.timeIntervalSince($0) < .minutes(10) } == true
+
+        // During parallel replacement the outgoing sensor remains Trio's CGM
+        // source. Its reliable glucose therefore wins over the pending
+        // sensor's expected warmup state.
+        if activeReadingIsReliable {
+            return .reliable
+        }
+
+        if let pendingStart = state.pendingSessionAnchor,
+           state.pendingPeripheralIdentifier != nil
+        {
+            if case .verificationRequired = state.sensorReplacementState {
+                return .unreliable(.handoverVerification)
+            }
+            if case .reacquiring = state.sensorReplacementState {
+                return .unreliable(.handoverReacquisition)
+            }
+            if let pendingCommunication = state.pendingLastCommunicationDate,
+               now.timeIntervalSince(pendingCommunication) >= .minutes(8)
+            {
+                return .unreliable(.replacementNoSignal)
+            }
+            return now < pendingStart.addingTimeInterval(Self.warmupPeriod)
+                ? .unreliable(.replacementWarmup)
+                : .unreliable(.replacementConfirming)
+        }
+
+        if SmartSessionStatusPolicy.isStopped(status: state.lastStatus) {
+            return .unreliable(.notActivated)
+        }
+        guard let lastCommunication = state.lastCommunicationDate else {
+            return state.sensorSessionAnchor == nil
+                ? .unavailable
+                : .unreliable(.waitingForSensor)
+        }
+        if now.timeIntervalSince(lastCommunication) >= .minutes(8) {
+            return .unreliable(.noSignal)
+        }
+        if state.sensorSessionAnchor.map({ $0.addingTimeInterval(Self.sensorLifetime) <= now }) == true {
+            return .unreliable(.expired)
+        }
+        if smartWarmupEndsAt(now: now, state: state) != nil {
+            return .unreliable(.warmup)
+        }
+        if state.lastStatus != 0 || state.lastCalibrationTemperatureStatus != 0 {
+            return .unreliable(.checkSensor)
+        }
+        return .unavailable
     }
 
     public var glucoseDisplay: GlucoseDisplayable? {
@@ -664,29 +756,10 @@ public final class SmartCGMManager: CGMManager {
         let state = lockedState.value
         let now = Date()
 
-        if SmartSessionStatusPolicy.isStopped(status: state.lastStatus) {
-            return SmartStatusHighlight(
-                localizedMessage: String(localized: "Smart\nnot activated"),
-                imageName: "exclamationmark.triangle.fill",
-                state: .warning
-            )
-        }
-
-        guard let lastCommunication = state.lastCommunicationDate else {
-            return SmartStatusHighlight(
-                localizedMessage: String(localized: "Waiting for\nsensor"),
-                imageName: "dot.radiowaves.left.and.right",
-                state: .normalCGM
-            )
-        }
-        if now.timeIntervalSince(lastCommunication) >= .minutes(8) {
-            return SmartStatusHighlight(
-                localizedMessage: String(localized: "Smart\nno signal"),
-                imageName: "exclamationmark.circle.fill",
-                state: .warning
-            )
-        }
-
+        // A pending replacement is a separate sensor session. Its confirmed
+        // warmup must take visual precedence over the stopped/stale state of
+        // the outgoing sensor while Trio keeps that sensor's history and last
+        // reading available until handover.
         if let pendingStart = state.pendingSessionAnchor,
            state.pendingPeripheralIdentifier != nil
         {
@@ -707,6 +780,29 @@ public final class SmartCGMManager: CGMManager {
                     : String(localized: "New Smart\nconfirming"),
                 imageName: "hourglass",
                 state: .normalCGM
+            )
+        }
+
+        if SmartSessionStatusPolicy.isStopped(status: state.lastStatus) {
+            return SmartStatusHighlight(
+                localizedMessage: String(localized: "Smart\nnot activated"),
+                imageName: "exclamationmark.triangle.fill",
+                state: .warning
+            )
+        }
+
+        guard let lastCommunication = state.lastCommunicationDate else {
+            return SmartStatusHighlight(
+                localizedMessage: String(localized: "Waiting for\nsensor"),
+                imageName: "dot.radiowaves.left.and.right",
+                state: .normalCGM
+            )
+        }
+        if now.timeIntervalSince(lastCommunication) >= .minutes(8) {
+            return SmartStatusHighlight(
+                localizedMessage: String(localized: "Smart\nno signal"),
+                imageName: "exclamationmark.circle.fill",
+                state: .warning
             )
         }
 

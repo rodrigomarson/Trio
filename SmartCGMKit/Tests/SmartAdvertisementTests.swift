@@ -479,6 +479,123 @@ private typealias CGMAutomaticInsulinSafetyInterlock = SmartAutomaticInsulinSafe
         #expect(progress.percentComplete < 0.43)
     }
 
+    @Test(
+        "Prioritizes a warming replacement over a stopped outgoing Smart"
+    ) func prioritizesParallelWarmupOverStoppedOutgoingSensor() throws {
+        let now = Date()
+        let pendingStart = now.addingTimeInterval(.minutes(-45))
+        let pendingCommunication = now.addingTimeInterval(-5)
+        let manager = try #require(
+            SmartCGMManager(
+                restoring: [
+                    "peripheralIdentifier": UUID().uuidString,
+                    "sensorSessionAnchor": now.addingTimeInterval(.hours(-2)).timeIntervalSince1970,
+                    "lastMinutes": 0,
+                    "lastStatus": 1,
+                    "lastCommunicationDate": now.addingTimeInterval(.minutes(-15)).timeIntervalSince1970,
+                    "pendingPeripheralIdentifier": UUID().uuidString,
+                    "pendingSessionAnchor": pendingStart.timeIntervalSince1970,
+                    "pendingLastMinutes": 45,
+                    "pendingLastCommunicationDate": pendingCommunication.timeIntervalSince1970,
+                    "pendingReliableReadingCount": 0
+                ], startsMonitoring: false
+            )
+        )
+
+        let message = try #require(manager.cgmStatusHighlight?.localizedMessage)
+        let readyAt = try #require(manager.smartWarmupEndsAt)
+
+        #expect(message.localizedCaseInsensitiveContains("new Smart"))
+        #expect(message.localizedCaseInsensitiveContains("warming up"))
+        #expect(!message.localizedCaseInsensitiveContains("not activated"))
+        #expect(abs(readyAt.timeIntervalSince(pendingStart.addingTimeInterval(.hours(1)))) < 1)
+        #expect(manager.sensorObservation(now: now) == .unreliable(.replacementWarmup))
+        #expect(manager.cgmManagerStatus.hasValidSensorSession)
+        let reportedCommunication = try #require(manager.cgmManagerStatus.lastCommunicationDate)
+        #expect(abs(reportedCommunication.timeIntervalSince(pendingCommunication)) < 0.001)
+    }
+
+    @Test(
+        "Keeps the outgoing reliable Smart as the CGM observation during replacement warmup"
+    ) func keepsReliableOutgoingObservationDuringParallelWarmup() throws {
+        let now = Date()
+        let manager = try #require(
+            SmartCGMManager(
+                restoring: [
+                    "peripheralIdentifier": UUID().uuidString,
+                    "sensorSessionAnchor": now.addingTimeInterval(-.hours(24)).timeIntervalSince1970,
+                    "lastMinutes": 24 * 60,
+                    "lastStatus": 0,
+                    "lastCalibrationTemperatureStatus": 0,
+                    "lastCommunicationDate": now.timeIntervalSince1970,
+                    "currentGlucose": 112.0,
+                    "currentGlucoseDate": now.timeIntervalSince1970,
+                    "pendingPeripheralIdentifier": UUID().uuidString,
+                    "pendingSessionAnchor": now.addingTimeInterval(.minutes(-20)).timeIntervalSince1970,
+                    "pendingLastMinutes": 20,
+                    "pendingLastCommunicationDate": now.timeIntervalSince1970,
+                    "pendingReliableReadingCount": 0
+                ], startsMonitoring: false
+            )
+        )
+
+        #expect(manager.sensorObservation(now: now) == .reliable)
+    }
+
+    @Test("Does not report stale Smart communication as reliable") func rejectsStaleCommunicationObservation() throws {
+        let now = Date()
+        let manager = try #require(
+            SmartCGMManager(
+                restoring: [
+                    "peripheralIdentifier": UUID().uuidString,
+                    "sensorSessionAnchor": now.addingTimeInterval(-.hours(24)).timeIntervalSince1970,
+                    "lastMinutes": 24 * 60,
+                    "lastStatus": 0,
+                    "lastCalibrationTemperatureStatus": 0,
+                    "lastCommunicationDate": now.addingTimeInterval(-.minutes(9)).timeIntervalSince1970,
+                    "currentGlucose": 112.0,
+                    "currentGlucoseDate": now.addingTimeInterval(-.minutes(9)).timeIntervalSince1970
+                ], startsMonitoring: false
+            )
+        )
+
+        #expect(manager.sensorObservation(now: now) == .unreliable(.noSignal))
+    }
+
+    @Test(
+        "Reports initial Smart lifecycle states without claiming a valid stopped session"
+    ) func reportsInitialLifecycleObservations() throws {
+        let now = Date()
+        let stopped = try #require(
+            SmartCGMManager(
+                restoring: [
+                    "peripheralIdentifier": UUID().uuidString,
+                    "sensorSessionAnchor": now.timeIntervalSince1970,
+                    "lastMinutes": 0,
+                    "lastStatus": 1,
+                    "lastCommunicationDate": now.timeIntervalSince1970
+                ], startsMonitoring: false
+            )
+        )
+        #expect(stopped.sensorObservation(now: now) == .unreliable(.notActivated))
+        #expect(!stopped.cgmManagerStatus.hasValidSensorSession)
+
+        let warming = try #require(
+            SmartCGMManager(
+                restoring: [
+                    "peripheralIdentifier": UUID().uuidString,
+                    "sensorSessionAnchor": now.addingTimeInterval(.minutes(-30)).timeIntervalSince1970,
+                    "lastMinutes": 30,
+                    "lastStatus": 0,
+                    "lastCalibrationTemperatureStatus": 0,
+                    "lastCommunicationDate": now.timeIntervalSince1970
+                ], startsMonitoring: false
+            )
+        )
+        #expect(warming.sensorObservation(now: now) == .unreliable(.warmup))
+        #expect(warming.cgmManagerStatus.hasValidSensorSession)
+    }
+
     @Test("Schedules the three Smart replacement notifications") func schedulesSmartReplacementNotifications() {
         let now = Date(timeIntervalSince1970: 1_807_000_000)
         let expiresAt = now.addingTimeInterval(.hours(25))
