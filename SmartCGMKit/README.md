@@ -21,3 +21,8 @@ The host must declare Bluetooth background reception and required Bluetooth priv
 The public manager initializers start monitoring. Internal initializers allow deterministic state-restoration tests without radio or notification scheduling. Existing manager identifiers, state keys, Bluetooth restoration IDs and notification IDs are deliberately retained for in-place migration compatibility.
 
 This is a local engineering candidate. Simulator tests do not validate sensor hardware, iOS background delivery, energy consumption or production readiness. See the host's `DeveloperDocs/SmartCGM` for the migration inventory and validation record.
+
+Every future port must begin with the host's
+[`DeveloperDocs/SmartCGM/evolution-ledger.md`](../DeveloperDocs/SmartCGM/evolution-ledger.md).
+It is the preservation checklist for validated SMART behavior; a newer Trio
+base must not silently regress any recorded capability or safety gate.
