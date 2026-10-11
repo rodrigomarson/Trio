@@ -6,7 +6,10 @@ This candidate is based on the official `nightscout/Trio` `dev` commit
 `1bacd86fb19dc325dff044b8cfe52fb7da6c8b98` (dev 1.0.2.4). The validated
 SMART integration was reapplied in an isolated worktree and recorded as local
 commit `a138faf898ef7b60a4bb2eb26fe87785930892d8`. The production checkout and
-installed application were not modified.
+installed application were initially left unchanged while the candidate was
+validated. After explicit authorization, signed build 22 was installed in place
+on the production iPhone; the outcome is recorded in
+[`dev1024-installation.md`](dev1024-installation.md).
 
 All Xcode commands use `Trio.xcworkspace`. The official 1.0.2.4 submodule pins,
 including LoopAlgorithm, LoopKit, MedtrumKit, LibreLoop, LibreTransmitter, and
@@ -60,15 +63,20 @@ The archive retains the official development version values: short version
 1.0.2, development version 1.0.2.4, and build number 1. It is a compile artifact,
 not a signed installation candidate.
 
+A separate signed Release archive and exported IPA were then produced from
+commit `40d49355d` with build number 22. Code signing, entitlement, bundle and app
+group identity, pre-install backup, database integrity, in-place installation,
+post-install state restoration, a fresh SMART reading, and a completed Trio loop
+all passed. These production checks do not replace the automated validation
+above.
+
 ## Remaining gates
 
-No production installation, push, pull request, Xcode Cloud action, or public
-distribution was performed. A signed production candidate requires a separate
-build number and explicit installation approval, followed by an in-place data
-backup and integrity check.
+The explicitly authorized production installation was performed. No push, pull
+request, Xcode Cloud action, or public distribution was performed.
 
 Automated tests and an archive do not prove real notification presentation,
-longitudinal background BLE recovery, a complete physical parallel replacement,
-natural divergence/reacquisition, Nightscout note delivery, clinical readiness,
-or maintainer acceptance. Those gates remain separate and must be reported as
-such before publication or production use.
+longitudinal background BLE recovery, a complete future physical parallel
+replacement, natural divergence/reacquisition, notification delivery,
+Nightscout note delivery, clinical readiness, or maintainer acceptance. Those
+gates remain separate and must be reported as such before publication.

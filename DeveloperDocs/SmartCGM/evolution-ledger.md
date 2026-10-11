@@ -50,12 +50,20 @@ validated implementation.
 - Official base: `1bacd86fb19dc325dff044b8cfe52fb7da6c8b98`.
 - SMART port: `a138faf898ef7b60a4bb2eb26fe87785930892d8`.
 - Warmup/status/diagnostics improvements: `45db7bdda`.
+- Mandatory continuity ledger: `40d49355d`.
 - SmartCGMKit: 55 tests passed.
 - Focused Trio host integration and sensor-state log: 12 tests passed.
 - Complete Trio suite: 810 tests in 112 suites passed.
 - Unsigned arm64 Release archive passed.
 - Official LoopAlgorithm, LoopKit, MedtrumKit, LibreLoop, LibreTransmitter, and
   RoundWhiteDiscKit pins were retained.
+- Signed build 22 was installed in place on the production iPhone after explicit
+  authorization. The app bundle and app group identities were preserved.
+- Pre-install and post-install app-container copies passed SQLite integrity and
+  persisted-state validation. The installation retained the existing application
+  database identity.
+- The post-install runtime produced a fresh SMART reading, delivered it through
+  Trio, kept the pump connection healthy, and completed a loop successfully.
 
 This point adds correct parallel-warmup precedence, active/pending/stopped
 session validity, stale-communication rejection, and integration with Trio's
@@ -70,6 +78,7 @@ complete sensor replacement, natural divergence/reacquisition, Nightscout note
 delivery, clinical readiness, human provenance approval, or maintainer
 acceptance. Those gates must remain explicit.
 
-App-container backups do not include Keychain or HealthKit data. Production
-installation, push, PR creation, Xcode Cloud activity, and public distribution
-remain separately authorized actions.
+App-container backups do not include Keychain or HealthKit data. The build 22
+production installation was separately authorized and completed; any later
+installation, push, PR creation, Xcode Cloud activity, or public distribution
+remains a separately authorized action.
