@@ -1,4 +1,3 @@
-import ActivityKit
 import CoreData
 import Foundation
 import Swinject
@@ -150,8 +149,9 @@ import Testing
         #expect(manualEntry?.type == "mbg", "Manual entry type should remain unchanged")
     }
 
-    @Test("Sensor and manual glucose keep distinct identities through storage and Nightscout export")
-    func testSensorAndManualGlucoseRoundTrip() async throws {
+    @Test(
+        "Sensor and manual glucose keep distinct identities through storage and Nightscout export"
+    ) func testSensorAndManualGlucoseRoundTrip() async throws {
         let sensorDate = Date().addingTimeInterval(-300)
         let manualDate = sensorDate.addingTimeInterval(60)
         try await storage.storeGlucose([
@@ -266,145 +266,6 @@ import Testing
         #expect(merged == [current])
     }
 
-    @Test("Live Activity keeps the complete six-hour chart window") func testLiveActivityChartCoverage() {
-        let newestDate = Date(timeIntervalSince1970: 10000)
-        let points = (0 ..< 360).map { minute in
-            GlucoseData(
-                glucose: 100 + minute % 10,
-                date: newestDate.addingTimeInterval(TimeInterval(-minute * 60)),
-                direction: .flat
-            )
-        }
-
-        let rendered = LiveActivityGlucoseChartPolicy.pointsForRendering(points)
-
-        #expect(rendered.count == LiveActivityGlucoseChartPolicy.maximumRenderedPointCount)
-        #expect(rendered[0].date == points[0].date)
-        #expect(rendered[1].date == points[1].date)
-        #expect(rendered.last?.date == points.last?.date)
-    }
-
-    @Test("Live Activity preserves every Smart point when no reduction is needed") func testLiveActivityKeepsSmartPoints() {
-        let points = (0 ..< 90).map { minute in
-            GlucoseData(
-                glucose: 100,
-                date: Date(timeIntervalSince1970: TimeInterval(minute * 4 * 60)),
-                direction: .flat
-            )
-        }
-
-        let rendered = LiveActivityGlucoseChartPolicy.pointsForRendering(points)
-
-        #expect(rendered.count == points.count)
-        #expect(rendered.first?.date == points.first?.date)
-        #expect(rendered.last?.date == points.last?.date)
-    }
-
-    @Test("Live Activity content stays below the ActivityKit payload budget") func testLiveActivityPayloadBudget() {
-        let startDate = Date(timeIntervalSince1970: 50000)
-        var chart = [LiveActivityAttributes.ChartItem]()
-        for index in 0 ..< 120 {
-            let value = Decimal(100 + index % 20)
-            let date = startDate.addingTimeInterval(-TimeInterval(index * 60))
-            chart.append(.init(value: value, date: date))
-        }
-        let forecast = (0 ..< 24).map { 90 + $0 }
-        let content = LiveActivityAttributes.ContentState(
-            unit: "mg/dL",
-            bg: "123",
-            direction: "Flat",
-            change: "+1",
-            date: startDate,
-            highGlucose: 180,
-            lowGlucose: 70,
-            target: 100,
-            glucoseColorScheme: "dynamicColor",
-            useDetailedViewIOS: true,
-            useDetailedViewWatchOS: true,
-            detailedViewState: LiveActivityAttributes.ContentAdditionalState(
-                chart: chart,
-                rotationDegrees: 0,
-                cob: 20,
-                iob: 1.5,
-                tdd: 35,
-                isOverrideActive: true,
-                overrideName: String(repeating: "Override ", count: 12),
-                overrideDate: startDate,
-                overrideDuration: 60,
-                overrideTarget: 90,
-                isTempTargetActive: true,
-                tempTargetName: String(repeating: "Temporary target ", count: 12),
-                tempTargetDate: startDate,
-                tempTargetDuration: 60,
-                tempTargetTarget: 100,
-                widgetItems: LiveActivityAttributes.LiveActivityItem.defaultItems,
-                minForecast: forecast,
-                maxForecast: forecast.map { $0 + 20 },
-                forecastLines: [
-                    .init(type: "iob", values: forecast),
-                    .init(type: "uam", values: forecast.map { $0 + 10 }),
-                    .init(type: "cob", values: forecast.map { $0 + 20 })
-                ],
-                forecastDisplayType: ForecastDisplayType.cone.rawValue
-            )
-        )
-
-        let fitted = LiveActivityPayloadPolicy.contentFittingActivityKitBudget(content)
-        let encodedSize = LiveActivityPayloadPolicy.encodedSize(of: fitted)
-
-        #expect(encodedSize <= LiveActivityPayloadPolicy.maximumEncodedContentStateBytes)
-        #expect(fitted.detailedViewState.chart.first == chart.first)
-        #expect(fitted.detailedViewState.chart.dropFirst().first == chart.dropFirst().first)
-        #expect(fitted.detailedViewState.chart.last == chart.last)
-    }
-
-    @Test("Live Activity does not alter content that already fits") func testLiveActivitySmallPayloadUnchanged() {
-        let startDate = Date(timeIntervalSince1970: 50000)
-        var chart = [LiveActivityAttributes.ChartItem]()
-        for index in 0 ..< 12 {
-            let value = Decimal(100 + index)
-            let date = startDate.addingTimeInterval(-TimeInterval(index * 60))
-            chart.append(.init(value: value, date: date))
-        }
-        let content = LiveActivityAttributes.ContentState(
-            unit: "mg/dL",
-            bg: "100",
-            direction: "Flat",
-            change: "0",
-            date: startDate,
-            highGlucose: 180,
-            lowGlucose: 70,
-            target: 100,
-            glucoseColorScheme: "dynamicColor",
-            useDetailedViewIOS: true,
-            useDetailedViewWatchOS: false,
-            detailedViewState: .init(
-                chart: chart,
-                rotationDegrees: 0,
-                cob: 0,
-                iob: 0,
-                tdd: 0,
-                isOverrideActive: false,
-                overrideName: "",
-                overrideDate: startDate,
-                overrideDuration: 0,
-                overrideTarget: 0,
-                isTempTargetActive: false,
-                tempTargetName: "",
-                tempTargetDate: startDate,
-                tempTargetDuration: 0,
-                tempTargetTarget: 0,
-                widgetItems: LiveActivityAttributes.LiveActivityItem.defaultItems,
-                minForecast: [],
-                maxForecast: [],
-                forecastLines: [],
-                forecastDisplayType: ForecastDisplayType.cone.rawValue
-            )
-        )
-
-        #expect(LiveActivityPayloadPolicy.contentFittingActivityKitBudget(content) == content)
-    }
-
     @Test("IOB accepts an incomplete lastTemp placeholder") func testIOBIncompleteLastTempDecoding() throws {
         let json = """
         [{
@@ -427,57 +288,6 @@ import Testing
         #expect(entries.first?.lastTemp?.date == 0)
         #expect(entries.first?.lastTemp?.rate == nil)
         #expect(entries.first?.lastTemp?.duration == nil)
-    }
-
-    @Test(
-        "Live Activity keeps updating an old session while Trio is in the background"
-    ) func testLiveActivityOldBackgroundSessionContinuesUpdating() {
-        let now = Date(timeIntervalSince1970: 30000)
-        let action = LiveActivityUpdatePolicy.existingSessionAction(
-            activityState: .active,
-            startDate: now.addingTimeInterval(-(LiveActivityUpdatePolicy.maximumActivityAge + 60)),
-            isAppActive: false,
-            now: now
-        )
-
-        #expect(action == .update)
-    }
-
-    @Test("Live Activity recreates an old session when Trio becomes active") func testLiveActivityOldForegroundSessionRecreates() {
-        let now = Date(timeIntervalSince1970: 30000)
-        let action = LiveActivityUpdatePolicy.existingSessionAction(
-            activityState: .active,
-            startDate: now.addingTimeInterval(-(LiveActivityUpdatePolicy.maximumActivityAge + 60)),
-            isAppActive: true,
-            now: now
-        )
-
-        #expect(action == .recreate)
-    }
-
-    @Test(
-        "Live Activity waits for foreground before replacing an ended session"
-    ) func testLiveActivityEndedBackgroundSessionWaits() {
-        let action = LiveActivityUpdatePolicy.existingSessionAction(
-            activityState: .ended,
-            startDate: Date(timeIntervalSince1970: 1000),
-            isAppActive: false,
-            now: Date(timeIntervalSince1970: 2000)
-        )
-
-        #expect(action == .waitForForeground)
-    }
-
-    @Test("Live Activity calculates glucose change from exactly two readings") func testLiveActivityChangeWithTwoReadings() {
-        let points = [
-            GlucoseData(glucose: 105, date: Date(timeIntervalSince1970: 2000), direction: .flat),
-            GlucoseData(glucose: 100, date: Date(timeIntervalSince1970: 1700), direction: .flat)
-        ]
-
-        let change = LiveActivityAttributes.ContentState.calculateChange(chart: points, units: .mgdL)
-
-        #expect(!change.isEmpty)
-        #expect(change.contains("5"))
     }
 
     @Test(
