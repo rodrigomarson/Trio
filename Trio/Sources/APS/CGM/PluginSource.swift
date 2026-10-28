@@ -257,11 +257,6 @@ extension PluginSource: CGMManagerDelegate {
                     smartManager.sensorObservation.cgmSensorObservation
                 )
             }
-            if let smartManager = manager as? SmartCGMManager {
-                self.glucoseManager?.reportCGMSensorObservation(
-                    smartManager.sensorObservation.cgmSensorObservation
-                )
-            }
         }
     }
 
