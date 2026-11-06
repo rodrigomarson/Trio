@@ -70,6 +70,29 @@ session validity, stale-communication rejection, and integration with Trio's
 generic CGM sensor-state log. A reliable outgoing SMART remains the current CGM
 observation during parallel warmup.
 
+### Official Trio dev 1.0.2.59 candidate — November 6, 2026
+
+- Official base: `23bb3be3634e3d3f3fe2e9bcf525c3d4425b24ae`.
+- SMART merge: `dcbd10964`.
+- LoopKit next-dev compatibility: `1dc5e8683`.
+- LibreTransmitter Brazil safety port: `55b0d467066602f6231909274ad24b4e58fd9efc`
+  on official LibreTransmitter `fb8e4ad`.
+- SmartCGMKit generic-device build: passed.
+- Complete Trio generic-device Release build: passed.
+- SmartCGMKit and complete Trio test target graphs: build-for-testing passed.
+- Unsigned arm64 Release archive: passed.
+- Test execution is still open because the installed CoreSimulator framework is
+  incompatible with the current Xcode and simulator devices are disabled.
+- No installation, push, pull request, or distribution was performed.
+
+This candidate preserves SMART activation, warmup, replacement, restoration,
+reminders, calibration ownership, bounded history, divergence protection, and
+the persisted automatic-insulin interlock while adopting LoopKit's async device
+deletion, instance plugin identity, `LoopQuantity`, and DeviceManager status
+surface. It also preserves the explicit safe refusal for Libre 2 Plus Brazil.
+The local LibreTransmitter revision remains a fresh-clone/publication blocker.
+See [`dev10259-validation.md`](dev10259-validation.md) for the full boundary.
+
 ## Evidence boundaries
 
 Automated tests, builds, archives, and simulator launches do not prove physical
