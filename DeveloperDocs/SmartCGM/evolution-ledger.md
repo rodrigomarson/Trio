@@ -86,6 +86,9 @@ observation during parallel warmup.
 - Device catalog: 15 focused tests passed after adding the SMART manager to the
   test inventory.
 - Complete serialized Trio suite: 1,001 tests in 131 suites passed.
+- Restored the prior Trio Xcode Cloud fix that makes the Live Activity and Watch
+  targets inherit the app version/build instead of hard-coded `1.0 (1)` values;
+  the complete 1,001-test suite passed again.
 - Unsigned arm64 Release archive: passed.
 - Signed version 1.0.2 build 24 archive: passed deep-signature, provisioning,
   entitlement, embedded-framework, and aligned app/extension build-number

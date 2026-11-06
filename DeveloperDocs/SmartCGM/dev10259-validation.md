@@ -70,6 +70,10 @@ change.
 - Focused device-catalog execution: 15 tests in 1 suite passed after adding the
   SMART manager to the catalog test's persisted-identifier inventory.
 - Complete serialized `Trio Tests` execution: 1,001 tests in 131 suites passed.
+- Restored Trio's prior Xcode Cloud version-consistency fix after the current
+  project file had regressed Live Activity and Watch targets to hard-coded
+  version/build values. All application targets now inherit `APP_VERSION` and
+  `APP_BUILD_NUMBER`; the complete 1,001-test suite passed again after the fix.
 - Unsigned arm64 Release archive: succeeded at
   `/tmp/TrioSmartDev10259-20261106.xcarchive`.
 - Archive application version: 1.0.2; build number: 1.
@@ -87,6 +91,13 @@ identifier table even though the SMART catalog entry and its dedicated test were
 correct. The test inventory now uses `SmartCGMManager.pluginIdentifier`; focused
 and complete reruns pass. No production runtime, pump, therapy, or algorithm
 code changed in this correction.
+
+Cloud preflight also found that the current project file had lost the earlier
+Trio fix that keeps the iOS app, Live Activity extension, watch app, watch
+complication, and watch tests on the same marketing version and build number.
+The known project-level correction was restored. This prevents App Store Connect
+version-mismatch rejection and ensures a TestFlight install updates one coherent
+Trio application family.
 
 The local App Store Connect export was attempted only after archive validation.
 It stopped before uploading because Xcode 27.2 currently has no Apple account in
