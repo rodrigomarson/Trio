@@ -409,7 +409,7 @@ extension DeviceCatalog {
         ),
 
         CGMCatalogEntry(
-            .managed(SmartCGMManager.self),
+            .managed(SmartCGMManager.self, id: SmartCGMManager.pluginIdentifier),
             manufacturer: .smartLinX,
             name: "Smart / LinX (Beta)",
             icon: .none

@@ -94,7 +94,8 @@ import UIKit
 
     @Test("Smart remains a managed CGM in the official device catalog") func testSmartCatalogEntry() {
         let smart = DeviceCatalog.cgmEntry(id: SmartCGMManager.pluginIdentifier)
-        #expect(smart?.managerType?.pluginIdentifier == SmartCGMManager.pluginIdentifier)
+        #expect(smart?.managerType != nil)
+        #expect(smart?.id == SmartCGMManager.pluginIdentifier)
         #expect(smart?.cgmType == .plugin)
         #expect(smart?.manufacturer == .smartLinX)
         #expect(smart?.name == "Smart / LinX (Beta)")

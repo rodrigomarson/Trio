@@ -23,14 +23,16 @@ extension SmartCGMManager: CGMManagerUI {
         let setup = SmartCGMSetupViewController()
         let navigation = CGMManagerSettingsNavigationViewController(rootViewController: setup)
         setup.onSelection = { [weak navigation] result in
-            guard let navigation else { return }
-            let manager = SmartCGMManager(
-                peripheralIdentifier: result.peripheralIdentifier,
-                sessionStartDate: result.sessionStartDate
-            )
-            navigation.cgmManagerOnboardingDelegate?.cgmManagerOnboarding(didCreateCGMManager: manager)
-            navigation.cgmManagerOnboardingDelegate?.cgmManagerOnboarding(didOnboardCGMManager: manager)
-            navigation.notifyComplete()
+            Task { @MainActor [weak navigation] in
+                guard let navigation else { return }
+                let manager = SmartCGMManager(
+                    peripheralIdentifier: result.peripheralIdentifier,
+                    sessionStartDate: result.sessionStartDate
+                )
+                navigation.cgmManagerOnboardingDelegate?.cgmManagerOnboarding(didCreateCGMManager: manager)
+                navigation.cgmManagerOnboardingDelegate?.cgmManagerOnboarding(didOnboardCGMManager: manager)
+                navigation.notifyComplete()
+            }
         }
         return .userInteractionRequired(navigation)
     }
@@ -65,8 +67,9 @@ extension SmartCGMManager: CGMManagerUI {
             navigation?.notifyComplete()
         }
         actions.onDelete = { [weak self, weak navigation] in
-            self?.delete {
-                DispatchQueue.main.async {
+            Task { [weak self, weak navigation] in
+                await self?.delete()
+                await MainActor.run {
                     navigation?.notifyComplete()
                 }
             }
@@ -689,7 +692,7 @@ private struct SmartCGMSettingsView: View {
     private func formattedGlucose(_ glucose: Double?) -> String {
         guard let glucose else { return "–" }
         return displayGlucosePreference.format(
-            HKQuantity(unit: HKUnit(from: "mg/dL"), doubleValue: glucose)
+            LoopQuantity(unit: .milligramsPerDeciliter, doubleValue: glucose)
         )
     }
 

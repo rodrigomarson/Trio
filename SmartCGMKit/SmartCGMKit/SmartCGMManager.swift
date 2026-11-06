@@ -333,7 +333,7 @@ public final class SmartCGMManager: CGMManager {
     private struct DisplayState: GlucoseDisplayable {
         let isStateValid: Bool
         let trendType: GlucoseTrend?
-        let trendRate: HKQuantity?
+        let trendRate: LoopQuantity?
         let isLocal = true
         let glucoseRangeCategory: GlucoseRangeCategory? = nil
     }
@@ -569,6 +569,8 @@ public final class SmartCGMManager: CGMManager {
     }
 
     public var localizedTitle: String { Self.localizedTitle }
+    public var pluginIdentifier: String { Self.pluginIdentifier }
+    public func markAsDepedency(_: Bool) {}
     public var isOnboarded: Bool { true }
     public var appURL: URL? { nil }
     // Keep Trio's established polling and pump-heartbeat fallback enabled for
@@ -578,6 +580,22 @@ public final class SmartCGMManager: CGMManager {
     public var managedDataInterval: TimeInterval? { .hours(3) }
     public static var healthKitStorageDelay: TimeInterval { 0 }
     public var shouldSyncToRemoteService: Bool { true }
+
+    public var inSignalLoss: Bool {
+        let state = lockedState.value
+        guard state.sensorSessionAnchor != nil || state.pendingSessionAnchor != nil else { return false }
+        let latestCommunication = [state.lastCommunicationDate, state.pendingLastCommunicationDate]
+            .compactMap { $0 }
+            .max()
+        return latestCommunication.map { Date().timeIntervalSince($0) >= .minutes(8) } ?? true
+    }
+
+    public var isInoperable: Bool {
+        let state = lockedState.value
+        return state.sensorSessionAnchor.map {
+            $0.addingTimeInterval(Self.sensorLifetime) <= Date()
+        } ?? false
+    }
 
     public var cgmManagerDelegate: CGMManagerDelegate? {
         get { delegate.delegate }
@@ -729,7 +747,7 @@ public final class SmartCGMManager: CGMManager {
         completion(.noData)
     }
 
-    public func delete(completion: @escaping () -> Void) {
+    public func delete() async {
         let state = lockedState.value
         SmartAutomaticInsulinSafetyInterlock.clear(
             sensorIdentifier: state.peripheralIdentifier.uuidString
@@ -739,7 +757,7 @@ public final class SmartCGMManager: CGMManager {
             cancelReplacementNotifications(for: pendingIdentifier)
         }
         scanner.stop()
-        notifyDelegateOfDeletion(completion: completion)
+        await cgmManagerDelegate?.cgmManagerWantsDeletion(self)
     }
 
     public func acknowledgeAlert(
@@ -748,6 +766,8 @@ public final class SmartCGMManager: CGMManager {
     ) {
         completion(nil)
     }
+
+    public func acknowledgeAlert(alertIdentifier _: LoopKit.Alert.AlertIdentifier) async throws {}
 
     public func getSoundBaseURL() -> URL? { nil }
     public func getSounds() -> [LoopKit.Alert.Sound] { [] }
@@ -1313,7 +1333,7 @@ public final class SmartCGMManager: CGMManager {
 
         let sample = NewGlucoseSample(
             date: sessionAnchor.addingTimeInterval(.minutes(Double(emittedMinute))),
-            quantity: HKQuantity(
+            quantity: LoopQuantity(
                 unit: .milligramsPerDeciliter,
                 doubleValue: emittedEstimate.glucose
             ),
@@ -1542,9 +1562,9 @@ public final class SmartCGMManager: CGMManager {
         return .downDownDown
     }
 
-    private static func trendQuantity(for rate: Double?) -> HKQuantity? {
+    private static func trendQuantity(for rate: Double?) -> LoopQuantity? {
         rate.map {
-            HKQuantity(unit: .milligramsPerDeciliterPerMinute, doubleValue: $0)
+            LoopQuantity(unit: .milligramsPerDeciliterPerMinute, doubleValue: $0)
         }
     }
 
@@ -1853,7 +1873,7 @@ public final class SmartCGMManager: CGMManager {
                     Self.backfillTrendRate(for: selected, at: index)
                 return NewGlucoseSample(
                     date: date,
-                    quantity: HKQuantity(
+                    quantity: LoopQuantity(
                         unit: .milligramsPerDeciliter,
                         doubleValue: record.glucose
                     ),
