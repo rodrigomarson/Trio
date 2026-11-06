@@ -24,8 +24,8 @@
 	branch = trio-next-dev
 [submodule "LibreTransmitter"]
 	path = LibreTransmitter
-	url = https://github.com/loopandlearn/LibreTransmitter.git
-	branch = trio-next-dev
+	url = https://github.com/rodrigomarson/LibreTransmitter.git
+	branch = candidate/libre-brasil-trio-next-dev-10259
 [submodule "TidepoolService"]
 	path = TidepoolService
 	url = https://github.com/loopandlearn/TidepoolService.git

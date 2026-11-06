@@ -52,10 +52,11 @@ pairing diagnostics and the user-facing safe fallback. The official simulator
 pairing command helper and string-catalog version were preserved during the
 conflict resolution.
 
-This local submodule revision is not published upstream. A fresh external clone
-cannot reproduce it until an accepted or otherwise reachable revision replaces
-the local-only pin. That remains a publication blocker, not a local build
-failure.
+The safety revision is published on the owner's LibreTransmitter fork as branch
+`candidate/libre-brasil-trio-next-dev-10259`, and this Trio candidate points the
+LibreTransmitter submodule at that reachable revision. It remains intentionally
+separate from any upstream contribution until maintainers accept an equivalent
+change.
 
 ## Validation performed on November 6, 2026
 
@@ -92,9 +93,9 @@ It stopped before uploading because Xcode 27.2 currently has no Apple account in
 its local account list. Historical local Xcode Cloud metadata independently
 confirms the Trio product, enabled `Trio Manual Build` workflow, and two
 successful cloud builds from the legacy `rodrigo-v0.8.3` and
-`rodrigo-v0.8.4` branches. The current candidate and its LibreTransmitter
-revision are not yet reachable from the fork, so they cannot be submitted to
-that cloud workflow until both revisions are deliberately published.
+`rodrigo-v0.8.4` branches. The LibreTransmitter revision is now reachable from
+the owner's fork. The Trio candidate still requires publication and a clean
+recursive-clone validation before it can be submitted to that cloud workflow.
 
 Thread Sanitizer was disabled only through the generic-device build command
 because it is unsupported for generic iOS/watchOS archive targets; no project
@@ -102,9 +103,9 @@ setting was changed for that workaround.
 
 ## Remaining gates
 
-Before cloud distribution, publish or replace the local LibreTransmitter
-revision, publish the reviewed Trio candidate to the owner's fork, and point a
-reviewed Xcode Cloud workflow at those reachable revisions. Push, Xcode Cloud
+Before cloud distribution, publish the reviewed Trio candidate to the owner's
+fork, validate a clean recursive clone, and point a reviewed Xcode Cloud
+workflow at those reachable revisions. Push, Xcode Cloud
 execution, TestFlight distribution, and installation remain separately
 authorized actions. Before any direct installation, review production-state
 backup and integrity evidence; installation requires explicit authorization.
