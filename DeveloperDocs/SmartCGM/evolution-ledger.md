@@ -94,11 +94,14 @@ observation during parallel warmup.
   entitlement, embedded-framework, and aligned app/extension build-number
   checks.
 - Historical Xcode Cloud state confirms the Trio product, enabled `Trio Manual
-  Build` workflow, and two successful July 2026 cloud builds. The current Xcode
-  local account list is empty. The LibreTransmitter pin is published on the
-  owner's fork; the Trio candidate and clean recursive-clone check remain
-  pending. No TestFlight upload occurred.
-- No installation, push, pull request, or distribution was performed.
+  Build` workflow, and two successful July 2026 cloud builds. The Apple account
+  is signed in, but Apple blocks both Xcode Cloud access and local App Store
+  Connect export until the Account Holder reviews the updated Developer Program
+  License Agreement. Both attempts stopped before upload.
+- The LibreTransmitter pin and Trio candidate are published on the owner's
+  forks. A clean recursive clone resolved packages and completed a generic
+  device Release build. No cloud build, TestFlight upload, installation, pull
+  request, or public distribution occurred.
 
 This candidate preserves SMART activation, warmup, replacement, restoration,
 reminders, calibration ownership, bounded history, divergence protection, and

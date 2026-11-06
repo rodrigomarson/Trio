@@ -99,14 +99,15 @@ The known project-level correction was restored. This prevents App Store Connect
 version-mismatch rejection and ensures a TestFlight install updates one coherent
 Trio application family.
 
-The local App Store Connect export was attempted only after archive validation.
-It stopped before uploading because Xcode 27.2 currently has no Apple account in
-its local account list. Historical local Xcode Cloud metadata independently
-confirms the Trio product, enabled `Trio Manual Build` workflow, and two
-successful cloud builds from the legacy `rodrigo-v0.8.3` and
-`rodrigo-v0.8.4` branches. The LibreTransmitter revision is now reachable from
-the owner's fork. The Trio candidate still requires publication and a clean
-recursive-clone validation before it can be submitted to that cloud workflow.
+The LibreTransmitter revision and Trio candidate are reachable from the owner's
+forks, and a clean recursive clone resolved packages and completed a generic
+device Release build. Xcode 27.2 confirms that the Apple account is signed in,
+the Trio product is available, and the enabled `Trio Manual Build` workflow is
+still present. Xcode Cloud nevertheless refuses access until the Account Holder
+reviews Apple's updated Developer Program License Agreement. A second local App
+Store Connect export attempt failed at the same account-access gate before any
+binary was uploaded. No cloud build, TestFlight upload, or device installation
+occurred.
 
 Thread Sanitizer was disabled only through the generic-device build command
 because it is unsupported for generic iOS/watchOS archive targets; no project
@@ -114,12 +115,13 @@ setting was changed for that workaround.
 
 ## Remaining gates
 
-Before cloud distribution, publish the reviewed Trio candidate to the owner's
-fork, validate a clean recursive clone, and point a reviewed Xcode Cloud
-workflow at those reachable revisions. Push, Xcode Cloud
-execution, TestFlight distribution, and installation remain separately
-authorized actions. Before any direct installation, review production-state
-backup and integrity evidence; installation requires explicit authorization.
+Before cloud distribution, the Account Holder must review Apple's updated
+Developer Program License Agreement. After Apple restores account access, point
+the existing reviewed `Trio Manual Build` workflow at the published candidate
+branch and verify that build 24 reaches TestFlight. Installation must be an
+in-place TestFlight update of the existing Trio application identity, followed
+by production-state and runtime checks; no parallel application identity is
+permitted.
 
 Automated compilation and archive evidence do not prove runtime restoration,
 physical SMART activation, warmup, replacement, handover, notification
