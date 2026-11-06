@@ -5,6 +5,14 @@ import Swinject
 import UIKit
 import UserNotifications
 
+/// Scheduled sensor replacement reminders must survive alarm snoozing.
+enum SensorReminderNotificationPolicy {
+    static func shouldRemoveForSnooze(_ request: UNNotificationRequest) -> Bool {
+        request.content.interruptionLevel != .critical &&
+            !request.identifier.hasPrefix("Trio.Smart.replacement.reminder.")
+    }
+}
+
 protocol TrioAlertManager: AnyObject {
     func issueAlert(_ alert: Alert)
     func retractAlert(identifier: Alert.Identifier)
@@ -441,7 +449,7 @@ final class BaseTrioAlertManager: TrioAlertManager, Injectable {
             let center = UNUserNotificationCenter.current()
             center.getPendingNotificationRequests { requests in
                 let ids = requests
-                    .filter { $0.content.interruptionLevel != .critical }
+                    .filter { SensorReminderNotificationPolicy.shouldRemoveForSnooze($0) }
                     .map(\.identifier)
                 if !ids.isEmpty { center.removePendingNotificationRequests(withIdentifiers: ids) }
                 center.getDeliveredNotifications { delivered in
@@ -459,7 +467,7 @@ final class BaseTrioAlertManager: TrioAlertManager, Injectable {
         let center = UNUserNotificationCenter.current()
         center.getPendingNotificationRequests { requests in
             let ids = requests
-                .filter { $0.content.interruptionLevel != .critical }
+                .filter { SensorReminderNotificationPolicy.shouldRemoveForSnooze($0) }
                 .map(\.identifier)
             guard !ids.isEmpty else { return }
             center.removePendingNotificationRequests(withIdentifiers: ids)

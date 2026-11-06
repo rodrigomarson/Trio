@@ -11,6 +11,8 @@ import LibreTransmitter
 import LoopKit
 import LoopKitUI
 import Observation
+import SmartCGMKit
+import SmartCGMKitUI
 import SwiftDate
 import SwiftUI
 import SyaiKit
@@ -968,6 +970,9 @@ extension Home {
 
                 let ends = start.addingTimeInterval(2 * 60 * 60)
                 return ends > Date.now ? ends : nil
+
+            case let smart as SmartCGMManager:
+                return smart.smartWarmupEndsAt
 
             case let libreLoop as LibreLoopCGMManager:
                 if case let .warmup(_, remaining) = libreLoop.sensorLifecycle, remaining > 0 {

@@ -1,6 +1,7 @@
 import CGMBLEKit
 import Foundation
 import G7SensorKit
+import SmartCGMKit
 
 /// What a single reading says about the sensor.
 enum CGMSensorObservation: Equatable {
@@ -19,6 +20,19 @@ extension AlgorithmState {
 extension CalibrationState {
     var observation: CGMSensorObservation {
         hasReliableGlucose ? .reliable : .unreliable(state: description)
+    }
+}
+
+extension SmartSensorObservation {
+    var cgmSensorObservation: CGMSensorObservation {
+        switch self {
+        case .reliable:
+            return .reliable
+        case let .unreliable(state):
+            return .unreliable(state: state.rawValue)
+        case .unavailable:
+            return .unavailable
+        }
     }
 }
 

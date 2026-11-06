@@ -299,7 +299,10 @@ struct CurrentGlucoseView: View {
     private var isInWarmup: Bool {
         guard let message = cgmStatus?.localizedMessage else { return false }
         let lowered = message.lowercased()
-        return lowered.contains("warming up") || lowered.contains("warmup")
+        return lowered.contains("warming up") ||
+            lowered.contains("warmup") ||
+            lowered.contains("aquecendo") ||
+            lowered.contains("aquecimento")
     }
 
     private var isStabilizing: Bool {

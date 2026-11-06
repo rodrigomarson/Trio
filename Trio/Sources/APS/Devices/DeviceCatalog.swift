@@ -22,6 +22,8 @@ import MockKit
 import MockKitUI
 import ObjectiveC
 import OmnipodKit
+import SmartCGMKit
+import SmartCGMKitUI
 import SyaiKit
 import SyaiKitUI
 import UIKit
@@ -46,6 +48,7 @@ enum DeviceManufacturer: CaseIterable {
     case medtrum
     case roche
     case senseonics
+    case smartLinX
     case sooil
     case syai
     case otherSources
@@ -61,6 +64,7 @@ enum DeviceManufacturer: CaseIterable {
         case .medtrum: return "Medtrum"
         case .roche: return "Roche"
         case .senseonics: return "Senseonics"
+        case .smartLinX: return "Smart / LinX"
         case .sooil: return "SOOIL"
         case .syai: return "Syai"
         case .otherSources: return String(localized: "Other Sources", comment: "Device picker section for data relays")
@@ -402,6 +406,13 @@ extension DeviceCatalog {
             manufacturer: .syai,
             name: "Syai Ultra",
             icon: .uiBundle(identifier: "org.loopkit.SyaiKitUI", asset: "sensor")
+        ),
+
+        CGMCatalogEntry(
+            .managed(SmartCGMManager.self),
+            manufacturer: .smartLinX,
+            name: "Smart / LinX (Beta)",
+            icon: .none
         ),
 
         CGMCatalogEntry(.native(.nightscout), manufacturer: .otherSources, icon: .trio(asset: "owl")),

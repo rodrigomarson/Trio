@@ -1,6 +1,8 @@
 import CoreData
 import LoopKit
 import Observation
+import SmartCGMKit
+import SmartCGMKitUI
 import SwiftDate
 import SwiftUI
 
@@ -9,6 +11,7 @@ extension Calibrations {
         @ObservationIgnored @Injected() var glucoseStorage: GlucoseStorage!
         @ObservationIgnored @Injected() var calibrationService: CalibrationService!
         @ObservationIgnored @Injected() var trioAlertManager: TrioAlertManager!
+        @ObservationIgnored @Injected() var fetchGlucoseManager: FetchGlucoseManager!
 
         var slope: Double = 1
         var intercept: Double = 1
@@ -16,8 +19,20 @@ extension Calibrations {
         var calibrations: [Calibration] = []
         var calibrate: (Int) -> Double = { Double($0) }
         var items: [Item] = []
+        var isSmartCGM = false
+        var sensorGlucose: Double?
+        var sensorGlucoseDate: Date?
+        var sensorTrendRate: Double?
+        var calibrationReadinessMessage = ""
+        var lastActionMessage: String?
 
         var units: GlucoseUnits = .mgdL
+
+        var canAddCalibration: Bool {
+            guard newCalibration > 0 else { return false }
+            guard isSmartCGM else { return true }
+            return sensorGlucose != nil && calibrationReadinessMessage.isEmpty
+        }
 
         let backgroundContext = CoreDataStack.shared.newTaskContext()
         private let viewContext = CoreDataStack.shared.persistentContainer.viewContext
@@ -26,6 +41,7 @@ extension Calibrations {
             units = settingsManager.settings.units
             calibrate = calibrationService.calibrate
             setupCalibrations()
+            refreshCalibrationCandidate()
         }
 
         private func setupCalibrations() {
@@ -62,11 +78,51 @@ extension Calibrations {
                 defer {
                     UIApplication.shared.endEditing()
                     setupCalibrations()
+                    refreshCalibrationCandidate()
                 }
 
                 var glucose = newCalibration
                 if units == .mmolL {
                     glucose = newCalibration.asMgdL
+                }
+
+                guard glucose >= 40, glucose <= 400 else {
+                    lastActionMessage = String(localized: "Fingerstick glucose must be between 40 and 400 mg/dL.")
+                    return
+                }
+
+                if isSmartCGM {
+                    guard
+                        let smartManager = fetchGlucoseManager.cgmManager as? SmartCGMManager,
+                        let candidate = smartManager.calibrationSnapshot()
+                    else {
+                        lastActionMessage = String(localized: "Wait for a new Smart reading before calibrating.")
+                        return
+                    }
+
+                    guard SmartCalibrationPolicy.isRecent(candidate.date) else {
+                        lastActionMessage = String(localized: "The Smart reading is stale. Wait for a new reading.")
+                        return
+                    }
+
+                    guard SmartCalibrationPolicy.isStable(candidate.trendRate) else {
+                        lastActionMessage = String(
+                            localized: "Glucose is changing rapidly. Wait for the trend to stabilize before calibrating."
+                        )
+                        return
+                    }
+
+                    calibrationService.addCalibration(
+                        Calibration(x: candidate.glucose, y: Double(glucose), date: candidate.date)
+                    )
+                    let releasedHandoverProtection = smartManager.confirmHandoverAfterFingerstick()
+                    newCalibration = 0
+                    lastActionMessage = releasedHandoverProtection
+                        ? String(
+                            localized: "Calibration recorded. The new Smart was accepted; automatic insulin will resume after three of its readings."
+                        )
+                        : String(localized: "Calibration recorded. Future readings will use the new adjustment.")
+                    return
                 }
 
                 let glucoseValuesIds = try await fetchGlucose()
@@ -79,13 +135,53 @@ extension Calibrations {
 
                     calibrationService.addCalibration(calibration)
                     info(.cgm, "Calibration added: BG \(glucose) mg/dL")
+                    newCalibration = 0
+                    lastActionMessage = String(localized: "Calibration recorded.")
                 } else {
                     debug(.cgm, "Calibration not added, no recent glucose")
                     issueStaleGlucoseAlert()
+                    lastActionMessage = String(localized: "Wait for a new sensor reading before calibrating.")
                     return
                 }
             } catch {
                 warning(.cgm, "Adding calibration failed", error: error)
+                lastActionMessage = String(localized: "Unable to record the calibration.")
+            }
+        }
+
+        func refreshCalibrationCandidate() {
+            isSmartCGM = fetchGlucoseManager.cgmManager is SmartCGMManager
+            guard isSmartCGM else {
+                sensorGlucose = nil
+                sensorGlucoseDate = nil
+                sensorTrendRate = nil
+                calibrationReadinessMessage = ""
+                return
+            }
+
+            guard
+                let smartManager = fetchGlucoseManager.cgmManager as? SmartCGMManager,
+                let candidate = smartManager.calibrationSnapshot()
+            else {
+                sensorGlucose = nil
+                sensorGlucoseDate = nil
+                sensorTrendRate = nil
+                calibrationReadinessMessage = String(localized: "Waiting for a current Smart reading.")
+                return
+            }
+
+            sensorGlucose = candidate.glucose
+            sensorGlucoseDate = candidate.date
+            sensorTrendRate = candidate.trendRate
+
+            if !SmartCalibrationPolicy.isRecent(candidate.date) {
+                calibrationReadinessMessage = String(localized: "The Smart reading is stale. Wait for the next reading.")
+            } else if !SmartCalibrationPolicy.isStable(candidate.trendRate) {
+                calibrationReadinessMessage = String(
+                    localized: "Glucose is not stable yet. Wait before recording the fingerstick."
+                )
+            } else {
+                calibrationReadinessMessage = ""
             }
         }
 

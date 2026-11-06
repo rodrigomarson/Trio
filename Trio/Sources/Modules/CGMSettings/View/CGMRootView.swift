@@ -1,4 +1,6 @@
 import LoopKitUI
+import SmartCGMKit
+import SmartCGMKitUI
 import SwiftUI
 import Swinject
 
@@ -83,11 +85,15 @@ extension CGMSettings {
                 )
                 .listRowBackground(Color.chart)
 
-                if state.cgmCurrent.type == .plugin && state.cgmCurrent.id.contains("Libre") {
+                if
+                    state.cgmCurrent.type == .plugin,
+                    state.cgmCurrent.id.contains("Libre") ||
+                    state.cgmCurrent.id == SmartCGMManager.pluginIdentifier
+                {
                     Section {
                         NavigationLink(
                             destination: Calibrations.RootView(resolver: resolver),
-                            label: { Text("Libre Calibrations") }
+                            label: { Text("Sensor Calibrations") }
                         )
                     }.listRowBackground(Color.chart)
                 }

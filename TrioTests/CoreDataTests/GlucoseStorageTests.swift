@@ -149,6 +149,38 @@ import Testing
         #expect(manualEntry?.type == "mbg", "Manual entry type should remain unchanged")
     }
 
+    @Test(
+        "Sensor and manual glucose keep distinct identities through storage and Nightscout export"
+    ) func testSensorAndManualGlucoseRoundTrip() async throws {
+        let sensorDate = Date().addingTimeInterval(-300)
+        let manualDate = sensorDate.addingTimeInterval(60)
+        try await storage.storeGlucose([
+            BloodGlucose(id: UUID().uuidString, sgv: 160, date: 123, dateString: sensorDate, glucose: 160, type: "sgv"),
+            BloodGlucose(id: UUID().uuidString, mbg: 161, date: 456, dateString: manualDate, glucose: 161, type: "mbg")
+        ])
+
+        let rows = try await coreDataStack.fetchEntitiesAsync(
+            ofType: GlucoseStored.self,
+            onContext: testContext,
+            predicate: NSPredicate(format: "glucose IN %@", [160, 161]),
+            key: "date",
+            ascending: true
+        ) as? [GlucoseStored]
+        #expect(rows?.count == 2)
+        #expect(rows?.first { $0.glucose == 160 }?.isManual == false)
+        #expect(rows?.first { $0.glucose == 161 }?.isManual == true)
+
+        let entries = try await storage.getGlucoseNotYetUploadedToNightscout()
+        let sensor = entries.first { $0.sgv == 160 }
+        let manual = entries.first { $0.mbg == 161 }
+        #expect(sensor?.mbg == nil)
+        #expect(sensor?.type == "sgv")
+        #expect(sensor?.dateString == sensorDate)
+        #expect(manual?.sgv == nil)
+        #expect(manual?.type == "mbg")
+        #expect(manual?.dateString == manualDate)
+    }
+
     @Test("Sub-39 glucose is clamped to 39 on storeGlucose") func testStoreGlucoseClampsBelowMinimum() async throws {
         // Given a CGM reading below the 39 mg/dL floor (e.g. LibreTransmitter delivering 23)
         let testGlucose = [
@@ -254,6 +286,62 @@ import Testing
         }
     }
 
+    @Test("CGM state upload ledger excludes completed treatments") func testCGMStateUploadLedgerPending() {
+        let first = makeSensorChange(date: Date(timeIntervalSince1970: 1000), notes: "first")
+        let second = makeSensorChange(date: Date(timeIntervalSince1970: 2000), notes: "second")
+
+        let pending = CGMStateUploadLedger.pending(
+            all: [second, first],
+            uploaded: [first]
+        )
+
+        #expect(pending == [second])
+    }
+
+    @Test("CGM state upload ledger merges, deduplicates, and prunes") func testCGMStateUploadLedgerMerge() {
+        let now = Date(timeIntervalSince1970: 4_000_000)
+        let expired = makeSensorChange(
+            date: now.addingTimeInterval(-31.days.timeInterval),
+            notes: "expired"
+        )
+        let current = makeSensorChange(
+            date: now.addingTimeInterval(-1.days.timeInterval),
+            notes: "current"
+        )
+
+        let merged = CGMStateUploadLedger.merging(
+            existing: [expired, current],
+            successfullyUploaded: [current],
+            now: now
+        )
+
+        #expect(merged == [current])
+    }
+
+    @Test("IOB accepts an incomplete lastTemp placeholder") func testIOBIncompleteLastTempDecoding() throws {
+        let json = """
+        [{
+          "iob": 0,
+          "activity": 0,
+          "basaliob": 0,
+          "bolusiob": 0,
+          "netbasalinsulin": 0,
+          "bolusinsulin": 0,
+          "iobWithZeroTemp": null,
+          "lastBolusTime": null,
+          "lastTemp": {"date": 0},
+          "time": null
+        }]
+        """
+
+        let entries = try JSONDecoder().decode([IOBEntry].self, from: Data(json.utf8))
+
+        #expect(entries.count == 1)
+        #expect(entries.first?.lastTemp?.date == 0)
+        #expect(entries.first?.lastTemp?.rate == nil)
+        #expect(entries.first?.lastTemp?.duration == nil)
+    }
+
     @Test(
         "Test glucose alarms",
         .enabled(if: false, "Flaky test, disabled while investigating")
@@ -353,4 +441,15 @@ import Testing
          // longAvgDelta: only the 30m window: (100–130)/30*5 = –5
          #expect(status!.longAvgDelta == -5)
      }*/
+
+    private func makeSensorChange(date: Date, notes: String) -> NightscoutTreatment {
+        NightscoutTreatment(
+            eventType: .nsSensorChange,
+            createdAt: date,
+            enteredBy: NightscoutTreatment.local,
+            notes: notes,
+            targetTop: nil,
+            targetBottom: nil
+        )
+    }
 }
