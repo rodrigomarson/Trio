@@ -144,3 +144,12 @@ and the generated framework Info.plists contain marketing version 1.0.2. The
 focused SmartCGMKit suite was rerun through the workspace: 55 tests in 3 suites
 passed with no failures. This correction changes distribution metadata only;
 it does not change sensor, pump, therapy, or loop behavior.
+
+The repair was published as commit `9b89cd2cc` and Xcode Cloud execution 17
+used that exact commit. Both required actions (`Archive - iOS` and
+`Archive - watchOS`) completed successfully with no issues. App Store Connect
+accepted version 1.0.2 build 17, reports processing state `VALID`, and reports
+internal state `READY_FOR_BETA_TESTING`. The build was assigned to the internal
+`Trio TestFlight` group for the same production application identity. No direct
+device installation was performed; installation remains an in-place TestFlight
+update initiated on the production iPhone.

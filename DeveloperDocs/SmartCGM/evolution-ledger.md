@@ -123,6 +123,12 @@ See [`dev10259-validation.md`](dev10259-validation.md) for the full boundary.
   generated framework Info.plists, and all 55 SmartCGMKit tests passed.
 - Execution 16 did not create a TestFlight build. The repair is metadata-only
   and does not alter SMART runtime behavior, therapy, pump, or loop code.
+- The repair was published as `9b89cd2cc`. Xcode Cloud execution 17 built that
+  exact commit; both required archive actions succeeded with no issues.
+- App Store Connect accepted version 1.0.2 build 17 as `VALID` and
+  `READY_FOR_BETA_TESTING`. It is assigned to the production app's internal
+  `Trio TestFlight` group and is ready for an in-place TestFlight update. No
+  direct device installation was performed.
 
 ## Evidence boundaries
 
