@@ -80,9 +80,20 @@ observation during parallel warmup.
 - SmartCGMKit generic-device build: passed.
 - Complete Trio generic-device Release build: passed.
 - SmartCGMKit and complete Trio test target graphs: build-for-testing passed.
+- Xcode system components were installed and CoreSimulator execution was
+  restored.
+- SmartCGMKit: 55 tests in 3 suites passed.
+- Device catalog: 15 focused tests passed after adding the SMART manager to the
+  test inventory.
+- Complete serialized Trio suite: 1,001 tests in 131 suites passed.
 - Unsigned arm64 Release archive: passed.
-- Test execution is still open because the installed CoreSimulator framework is
-  incompatible with the current Xcode and simulator devices are disabled.
+- Signed version 1.0.2 build 24 archive: passed deep-signature, provisioning,
+  entitlement, embedded-framework, and aligned app/extension build-number
+  checks.
+- Historical Xcode Cloud state confirms the Trio product, enabled `Trio Manual
+  Build` workflow, and two successful July 2026 cloud builds. The current Xcode
+  local account list is empty, and the candidate plus its LibreTransmitter pin
+  are not yet published to the fork; no TestFlight upload occurred.
 - No installation, push, pull request, or distribution was performed.
 
 This candidate preserves SMART activation, warmup, replacement, restoration,

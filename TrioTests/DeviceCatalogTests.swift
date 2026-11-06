@@ -22,6 +22,7 @@ import UIKit
         "G7CGMManager": "G7CGMManager",
         "AccuChekCgmManager": "AccuChek",
         "EversenseCGMManager": "EversenseKit",
+        "SmartCGMManager": SmartCGMManager.pluginIdentifier,
         "SyaiCGMManager": "SyaiCGMManager"
     ]
 

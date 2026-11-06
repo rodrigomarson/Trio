@@ -63,24 +63,51 @@ failure.
 - Trio Release build for generic iOS device: succeeded.
 - SmartCGMKit test targets, build-for-testing: succeeded.
 - Complete `Trio Tests` target graph, build-for-testing: succeeded.
+- Required Xcode system components were installed and the CoreSimulator
+  compatibility failure was cleared.
+- SmartCGMKit execution: 55 tests in 3 suites passed.
+- Focused device-catalog execution: 15 tests in 1 suite passed after adding the
+  SMART manager to the catalog test's persisted-identifier inventory.
+- Complete serialized `Trio Tests` execution: 1,001 tests in 131 suites passed.
 - Unsigned arm64 Release archive: succeeded at
   `/tmp/TrioSmartDev10259-20261106.xcarchive`.
 - Archive application version: 1.0.2; build number: 1.
+- Signed distribution candidate: version 1.0.2, build 24. The app, Live Activity
+  extension, watch app, and watch complication all carry build 24; deep signature
+  validation passed; all four embedded provisioning profiles are current; the
+  application group, HealthKit, and push-notification entitlements are present;
+  and SmartCGMKit, SmartCGMKitUI, LibreTransmitter, and LibreTransmitterUI are
+  embedded.
 - `git diff --check`: passed.
 
-The current Xcode reports that the installed CoreSimulator framework is older
-than the version required by this Xcode. Simulator devices are therefore
-disabled. The test targets compiled, but tests were not executed in this
-checkpoint. Thread Sanitizer was disabled only through the generic-device build
-command because it is unsupported for generic iOS/watchOS archive targets; no
-project setting was changed for that workaround.
+The first complete test execution exposed one test-inventory omission:
+`DeviceCatalogTests` did not include `SmartCGMManager` in its expected plugin
+identifier table even though the SMART catalog entry and its dedicated test were
+correct. The test inventory now uses `SmartCGMManager.pluginIdentifier`; focused
+and complete reruns pass. No production runtime, pump, therapy, or algorithm
+code changed in this correction.
+
+The local App Store Connect export was attempted only after archive validation.
+It stopped before uploading because Xcode 27.2 currently has no Apple account in
+its local account list. Historical local Xcode Cloud metadata independently
+confirms the Trio product, enabled `Trio Manual Build` workflow, and two
+successful cloud builds from the legacy `rodrigo-v0.8.3` and
+`rodrigo-v0.8.4` branches. The current candidate and its LibreTransmitter
+revision are not yet reachable from the fork, so they cannot be submitted to
+that cloud workflow until both revisions are deliberately published.
+
+Thread Sanitizer was disabled only through the generic-device build command
+because it is unsupported for generic iOS/watchOS archive targets; no project
+setting was changed for that workaround.
 
 ## Remaining gates
 
-Before installation, restore an executable test destination and run the focused
-SMART suites plus the complete serialized Trio suite. Then review archive
-signing, entitlements, bundle/app-group identity, and production-state backup
-and integrity evidence. Installation requires separate explicit authorization.
+Before cloud distribution, publish or replace the local LibreTransmitter
+revision, publish the reviewed Trio candidate to the owner's fork, and point a
+reviewed Xcode Cloud workflow at those reachable revisions. Push, Xcode Cloud
+execution, TestFlight distribution, and installation remain separately
+authorized actions. Before any direct installation, review production-state
+backup and integrity evidence; installation requires explicit authorization.
 
 Automated compilation and archive evidence do not prove runtime restoration,
 physical SMART activation, warmup, replacement, handover, notification
