@@ -111,6 +111,19 @@ surface. It also preserves the explicit safe refusal for Libre 2 Plus Brazil.
 The local LibreTransmitter revision remains a fresh-clone/publication blocker.
 See [`dev10259-validation.md`](dev10259-validation.md) for the full boundary.
 
+### Xcode Cloud distribution metadata repair — November 6, 2026
+
+- The existing `Trio Manual Build` workflow was updated to the exact published
+  1.0.2.59 candidate branch after Apple's agreement gate was cleared.
+- Xcode Cloud execution 16 completed compilation, archive, and export, but App
+  Store Connect rejected the iOS product because the two SMART frameworks had
+  no `CFBundleShortVersionString`; the watchOS action succeeded.
+- `MARKETING_VERSION = 1.0.2` was added to Debug and Release for SmartCGMKit and
+  SmartCGMKitUI. A workspace Release build confirmed version 1.0.2 in both
+  generated framework Info.plists, and all 55 SmartCGMKit tests passed.
+- Execution 16 did not create a TestFlight build. The repair is metadata-only
+  and does not alter SMART runtime behavior, therapy, pump, or loop code.
+
 ## Evidence boundaries
 
 Automated tests, builds, archives, and simulator launches do not prove physical

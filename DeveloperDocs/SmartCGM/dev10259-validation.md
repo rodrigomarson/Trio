@@ -127,3 +127,20 @@ Automated compilation and archive evidence do not prove runtime restoration,
 physical SMART activation, warmup, replacement, handover, notification
 delivery, longitudinal background BLE reliability, pump connectivity, loop
 completion, clinical readiness, or maintainer acceptance.
+
+## Xcode Cloud distribution follow-up — November 6, 2026
+
+After the Account Holder accepted Apple's updated agreement, the existing
+`Trio Manual Build` workflow was pointed at the exact published candidate
+branch. Xcode Cloud execution 16 compiled, archived, and exported the iOS and
+watchOS products. The watchOS action succeeded. App Store Connect validation
+then rejected the iOS export only because `SmartCGMKit.framework` and
+`SmartCGMKitUI.framework` did not contain `CFBundleShortVersionString`. No
+TestFlight build was created by that execution.
+
+Both SMART framework targets now define `MARKETING_VERSION = 1.0.2` in Debug
+and Release. A Release build performed through `Trio.xcworkspace` succeeded,
+and the generated framework Info.plists contain marketing version 1.0.2. The
+focused SmartCGMKit suite was rerun through the workspace: 55 tests in 3 suites
+passed with no failures. This correction changes distribution metadata only;
+it does not change sensor, pump, therapy, or loop behavior.
